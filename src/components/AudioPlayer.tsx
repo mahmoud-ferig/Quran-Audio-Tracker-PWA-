@@ -402,6 +402,15 @@ export const AudioPlayer: React.FC<Props> = ({
 
   if (!track) return null;
 
+  const DEFAULT_QURAN_ARTWORK = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="32" fill="#059669"/>
+  <circle cx="60" cy="60" r="46" fill="#047857" stroke="#f59e0b" stroke-width="3"/>
+  <circle cx="60" cy="60" r="24" fill="#ffffff"/>
+  <circle cx="60" cy="60" r="10" fill="#059669"/>
+</svg>
+`)}`;
+
   return (
     <div className="player-bar">
       <audio
@@ -427,7 +436,7 @@ export const AudioPlayer: React.FC<Props> = ({
         {/* Left: Track Information */}
         <div className="player-track-info">
           <img
-            src={track.artwork_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'}
+            src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
             alt={track.name}
             className="player-artwork"
           />

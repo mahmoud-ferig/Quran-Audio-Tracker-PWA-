@@ -11,6 +11,8 @@ import {
   saveUserSettings
 } from './services/storage';
 import { initializeFirebase } from './firebase/config';
+import { getStoredTheme, applyTheme } from './services/theme';
+import type { ThemeMode } from './services/theme';
 import { Header } from './components/Header';
 import { ResumeBanner } from './components/ResumeBanner';
 import { ReciterSelector } from './components/ReciterSelector';
@@ -20,6 +22,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { CustomStreamModal } from './components/CustomStreamModal';
 
 export const App: React.FC = () => {
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
   const [userId, setUserId] = useState<string>(getOrCreateUserId());
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(() => initializeFirebase().isConfigured);
   const [selectedReciter, setSelectedReciter] = useState<Reciter>(RECITERS[0]);
@@ -29,6 +32,17 @@ export const App: React.FC = () => {
   const [progressMap, setProgressMap] = useState<Record<string, ListeningProgress>>({});
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
   const [favorites, setFavorites] = useState<number[]>([]);
+
+  // Apply theme on mount and when changed
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    applyTheme(next);
+  };
 
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -173,6 +187,8 @@ export const App: React.FC = () => {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenCustomStream={() => setIsCustomStreamOpen(true)}
         userId={userId}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Content Area */}
@@ -217,6 +233,8 @@ export const App: React.FC = () => {
         userId={userId}
         onUserIdChanged={(newId) => setUserId(newId)}
         onConfigUpdated={handleFirebaseConfigUpdated}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Custom Stream / SoundCloud Modal */}

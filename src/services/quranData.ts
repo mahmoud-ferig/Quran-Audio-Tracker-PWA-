@@ -1,12 +1,23 @@
 import type { Reciter, Track } from '../types';
 
+function makeAvatar(initials: string, arabic: string, bg = '#059669', gold = '#f59e0b'): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+    <rect width="120" height="120" rx="36" fill="${bg}"/>
+    <circle cx="60" cy="60" r="46" fill="#047857" stroke="${gold}" stroke-width="3" stroke-dasharray="4 2"/>
+    <circle cx="60" cy="60" r="34" fill="#064e3b"/>
+    <text x="60" y="56" font-family="'Amiri', serif" font-size="24" font-weight="bold" fill="${gold}" text-anchor="middle">${arabic}</text>
+    <text x="60" y="78" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="1">${initials}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export const RECITERS: Reciter[] = [
   {
     id: 'alafasy',
     name: 'Mishary Rashid Alafasy',
     arabicName: 'مشاري بن راشد العفاسي',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MRA', 'العفاسي'),
     serverUrl: 'https://server8.mp3quran.net/afs/'
   },
   {
@@ -14,7 +25,7 @@ export const RECITERS: Reciter[] = [
     name: 'Mohamed Siddiq Al-Minshawi',
     arabicName: 'محمد صديق المنشاوي (مرتل)',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MSM', 'المنشاوي'),
     serverUrl: 'https://server10.mp3quran.net/minsh/'
   },
   {
@@ -22,7 +33,7 @@ export const RECITERS: Reciter[] = [
     name: 'Al-Minshawi (Mujawwad)',
     arabicName: 'محمد صديق المنشاوي (مجود)',
     style: 'Mujawwad',
-    photoUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MSM', 'المنشاوي'),
     serverUrl: 'https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/'
   },
   {
@@ -30,7 +41,7 @@ export const RECITERS: Reciter[] = [
     name: 'Mahmoud Khalil Al-Husary',
     arabicName: 'محمود خليل الحصري',
     style: 'Murattal (Tajweed Master)',
-    photoUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MKH', 'الحصري'),
     serverUrl: 'https://server13.mp3quran.net/husr/'
   },
   {
@@ -38,7 +49,7 @@ export const RECITERS: Reciter[] = [
     name: 'Abdulbasit Abdulsamad',
     arabicName: 'عبد الباسط عبد الصمد',
     style: 'Mujawwad',
-    photoUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('ABA', 'عبد الباسط'),
     serverUrl: 'https://server7.mp3quran.net/basit/'
   },
   {
@@ -46,7 +57,7 @@ export const RECITERS: Reciter[] = [
     name: 'Abdul Rahman Al-Sudais',
     arabicName: 'عبد الرحمن السديس',
     style: 'Murattal (Haram Makkah)',
-    photoUrl: 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('ARS', 'السديس'),
     serverUrl: 'https://server11.mp3quran.net/sds/'
   },
   {
@@ -54,7 +65,7 @@ export const RECITERS: Reciter[] = [
     name: 'Saud Al-Shuraim',
     arabicName: 'سعود الشريم',
     style: 'Murattal (Haram Makkah)',
-    photoUrl: 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('SAS', 'الشريم'),
     serverUrl: 'https://server7.mp3quran.net/shur/'
   },
   {
@@ -62,7 +73,7 @@ export const RECITERS: Reciter[] = [
     name: 'Maher Al-Muaiqly',
     arabicName: 'ماهر المعيقلي',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MAM', 'المعيقلي'),
     serverUrl: 'https://server12.mp3quran.net/maher/'
   },
   {
@@ -70,7 +81,7 @@ export const RECITERS: Reciter[] = [
     name: 'Yasser Al-Dosari',
     arabicName: 'ياسر الدوسري',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('YAD', 'الدوسري'),
     serverUrl: 'https://server11.mp3quran.net/yasser/'
   },
   {
@@ -78,7 +89,7 @@ export const RECITERS: Reciter[] = [
     name: 'Noreen Mohammad Siddiq',
     arabicName: 'نورين محمد صديق',
     style: 'Murattal (Sudanese Al-Duri)',
-    photoUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('NMS', 'نورين'),
     serverUrl: 'https://server16.mp3quran.net/nourin_siddig/Rewayat-Aldori-A-n-Abi-Amr/'
   },
   {
@@ -86,7 +97,7 @@ export const RECITERS: Reciter[] = [
     name: 'Mahmoud Ali Al-Banna',
     arabicName: 'محمود علي البنا',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('MAB', 'البنا'),
     serverUrl: 'https://server8.mp3quran.net/bna/'
   },
   {
@@ -94,7 +105,7 @@ export const RECITERS: Reciter[] = [
     name: 'Ali Jaber',
     arabicName: 'علي جابر',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('AJ', 'علي جابر'),
     serverUrl: 'https://server11.mp3quran.net/a_jbr/'
   },
   {
@@ -102,7 +113,7 @@ export const RECITERS: Reciter[] = [
     name: 'Abu Bakr Al-Shatri',
     arabicName: 'أبو بكر الشاطري',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('ABS', 'الشاطري'),
     serverUrl: 'https://server11.mp3quran.net/shatri/'
   },
   {
@@ -110,7 +121,7 @@ export const RECITERS: Reciter[] = [
     name: 'Saad Al-Ghamdi',
     arabicName: 'سعد الغامدي',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('SAG', 'الغامدي'),
     serverUrl: 'https://server7.mp3quran.net/s_gmd/'
   },
   {
@@ -118,7 +129,7 @@ export const RECITERS: Reciter[] = [
     name: 'Idris Abkar',
     arabicName: 'إدريس أبكر',
     style: 'Murattal',
-    photoUrl: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=400&q=80',
+    photoUrl: makeAvatar('IA', 'إدريس أبكر'),
     serverUrl: 'https://server6.mp3quran.net/abkr/'
   }
 ];

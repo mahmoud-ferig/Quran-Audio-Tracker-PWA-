@@ -12,16 +12,32 @@ export default defineConfig({
         name: 'Quran Audio Tracker',
         short_name: 'QuranTracker',
         description: 'Lightweight Quran audio player with cross-device timestamp synchronization',
-        theme_color: '#080c16',
-        background_color: '#080c16',
+        theme_color: '#f8fafc',
+        background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           {
-            src: '/favicon.svg',
-            sizes: '192x192 512x512',
-            type: 'image/svg+xml',
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
             purpose: 'any maskable'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: '/apple-touch-icon.png',
+            sizes: '180x180',
+            type: 'image/png'
+          },
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
           }
         ]
       },

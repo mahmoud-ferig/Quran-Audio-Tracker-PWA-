@@ -9,6 +9,7 @@ import {
 } from '../firebase/config';
 import { setUserEmail, removeUserEmail, migrateUserData, getUserEmail } from '../services/storage';
 import { getSoundCloudClientId, setSoundCloudClientId } from '../services/soundcloud';
+import type { ThemeMode } from '../services/theme';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +17,8 @@ interface Props {
   userId: string;
   onUserIdChanged: (newId: string) => void;
   onConfigUpdated: () => void;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
 }
 
 export const SettingsModal: React.FC<Props> = ({
@@ -23,7 +26,9 @@ export const SettingsModal: React.FC<Props> = ({
   onClose,
   userId,
   onUserIdChanged,
-  onConfigUpdated
+  onConfigUpdated,
+  theme,
+  onToggleTheme
 }) => {
   const [activeTab, setActiveTab] = useState<'account' | 'firebase' | 'soundcloud'>('account');
   const [copied, setCopied] = useState(false);
@@ -219,6 +224,47 @@ export const SettingsModal: React.FC<Props> = ({
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Appearance / Theme Row */}
+            <div style={{
+              background: 'var(--bg-surface-elevated)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              marginTop: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  App Theme
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  {theme === 'light' ? 'Light Theme (Default)' : 'Dark Theme'}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="control-btn"
+                onClick={onToggleTheme}
+                style={{
+                  width: 'auto',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-subtle)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'}
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
