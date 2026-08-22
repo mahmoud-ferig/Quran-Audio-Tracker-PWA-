@@ -85,6 +85,16 @@ function saveLocalProgressMap(map: Record<string, ListeningProgress>): void {
 }
 
 /**
+ * Timeout promise wrapper to prevent hanging when Firestore database is not yet created or offline
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number = 2000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Firestore operation timed out')), ms))
+  ]);
+}
+
+/**
  * Migrate local progress, favorites, and settings from old ID to new Email ID
  */
 export async function migrateUserData(fromUserId: string, toEmail: string): Promise<void> {
@@ -95,7 +105,7 @@ export async function migrateUserData(fromUserId: string, toEmail: string): Prom
   const favorites = getLocalFavorites();
   const lastSession = await getLastSession(fromUserId);
 
-  // Sync all to the new email ID
+  // Sync all to the new email ID if Firestore is ready
   const { db, isConfigured } = initializeFirebase();
   if (isConfigured && db) {
     try {
@@ -106,40 +116,48 @@ export async function migrateUserData(fromUserId: string, toEmail: string): Prom
         const prog = localMap[trackId];
         const docKey = `${normalizedEmail}_${trackId}`;
         const docRef = doc(db, 'listening_progress', docKey);
-        promises.push(setDoc(docRef, {
-          userId: normalizedEmail,
-          trackId: prog.trackId,
-          surahNumber: prog.surahNumber,
-          reciterId: prog.reciterId,
-          currentTime: prog.currentTime,
-          duration: prog.duration,
-          percentage: prog.percentage,
-          updatedAt: prog.updatedAt
-        }, { merge: true }));
+        promises.push(
+          withTimeout(setDoc(docRef, {
+            userId: normalizedEmail,
+            trackId: prog.trackId,
+            surahNumber: prog.surahNumber,
+            reciterId: prog.reciterId,
+            currentTime: prog.currentTime,
+            duration: prog.duration,
+            percentage: prog.percentage,
+            updatedAt: prog.updatedAt
+          }, { merge: true }), 1500).catch((e) => console.warn('Firestore item sync skipped:', e))
+        );
       }
 
       // Migrate Favorites
       if (favorites.length > 0) {
         const favDoc = doc(db, 'user_favorites', normalizedEmail);
-        promises.push(setDoc(favDoc, {
-          userId: normalizedEmail,
-          surahNumbers: favorites,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }));
+        promises.push(
+          withTimeout(setDoc(favDoc, {
+            userId: normalizedEmail,
+            surahNumbers: favorites,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }), 1500).catch((e) => console.warn('Firestore favorites sync skipped:', e))
+        );
       }
 
       // Migrate Last Session
       if (lastSession) {
         const sessDoc = doc(db, 'listening_progress', `${normalizedEmail}_last_session`);
-        promises.push(setDoc(sessDoc, {
-          userId: normalizedEmail,
-          ...lastSession
-        }, { merge: true }));
+        promises.push(
+          withTimeout(setDoc(sessDoc, {
+            userId: normalizedEmail,
+            ...lastSession
+          }, { merge: true }), 1500).catch((e) => console.warn('Firestore session sync skipped:', e))
+        );
       }
 
-      await Promise.all(promises);
+      if (promises.length > 0) {
+        await withTimeout(Promise.all(promises), 2500).catch(() => {});
+      }
     } catch (e) {
-      console.warn('Migration to email partial warning:', e);
+      console.warn('Migration to email completed locally (Firestore unavailable):', e);
     }
   }
 }
@@ -162,7 +180,7 @@ export async function saveProgress(
     try {
       const docKey = `${userId}_${progress.trackId}`;
       const docRef = doc(db, 'listening_progress', docKey);
-      await setDoc(docRef, {
+      await withTimeout(setDoc(docRef, {
         userId,
         trackId: progress.trackId,
         surahNumber: progress.surahNumber,
@@ -171,7 +189,7 @@ export async function saveProgress(
         duration: progress.duration,
         percentage: progress.percentage,
         updatedAt: progress.updatedAt
-      }, { merge: true });
+      }, { merge: true }), 2000);
     } catch (err) {
       console.warn('Firestore progress write failed, fallback to local only:', err);
     }
@@ -195,8 +213,8 @@ export async function getTrackProgress(
     try {
       const docKey = `${userId}_${trackId}`;
       const docRef = doc(db, 'listening_progress', docKey);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
+      const snap = await withTimeout(getDoc(docRef), 2000);
+      if (snap && snap.exists()) {
         const data = snap.data() as ListeningProgress;
         // Merge with local if newer
         if (!cached || new Date(data.updatedAt) > new Date(cached.updatedAt)) {
@@ -226,14 +244,16 @@ export async function getAllProgress(
     try {
       const colRef = collection(db, 'listening_progress');
       const q = query(colRef, where('userId', '==', userId));
-      const snap = await getDocs(q);
-      snap.forEach((d) => {
-        const data = d.data() as ListeningProgress;
-        if (!localMap[data.trackId] || new Date(data.updatedAt) > new Date(localMap[data.trackId].updatedAt)) {
-          localMap[data.trackId] = data;
-        }
-      });
-      saveLocalProgressMap(localMap);
+      const snap = await withTimeout(getDocs(q), 2000);
+      if (snap) {
+        snap.forEach((d) => {
+          const data = d.data() as ListeningProgress;
+          if (!localMap[data.trackId] || new Date(data.updatedAt) > new Date(localMap[data.trackId].updatedAt)) {
+            localMap[data.trackId] = data;
+          }
+        });
+        saveLocalProgressMap(localMap);
+      }
     } catch (err) {
       console.warn('Firestore fetch all progress failed, returning local cache:', err);
     }
@@ -260,10 +280,10 @@ export async function saveLastSession(
     try {
       const docKey = `${userId}_last_session`;
       const docRef = doc(db, 'listening_progress', docKey);
-      await setDoc(docRef, {
+      await withTimeout(setDoc(docRef, {
         userId,
         ...session
-      }, { merge: true });
+      }, { merge: true }), 2000);
     } catch (err) {
       console.warn('Firestore last session write failed:', err);
     }
@@ -289,8 +309,8 @@ export async function getLastSession(
     try {
       const docKey = `${userId}_last_session`;
       const docRef = doc(db, 'listening_progress', docKey);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
+      const snap = await withTimeout(getDoc(docRef), 2000);
+      if (snap && snap.exists()) {
         const remoteSession = snap.data() as LastSession;
         if (!localSession || new Date(remoteSession.updatedAt) > new Date(localSession.updatedAt)) {
           localStorage.setItem(STORAGE_KEY_LOCAL_LAST_SESSION, JSON.stringify(remoteSession));
@@ -325,8 +345,8 @@ export async function getFavorites(userId: string): Promise<number[]> {
   if (isConfigured && db) {
     try {
       const docRef = doc(db, 'user_favorites', userId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
+      const snap = await withTimeout(getDoc(docRef), 2000);
+      if (snap && snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data.surahNumbers)) {
           localStorage.setItem(STORAGE_KEY_LOCAL_FAVORITES, JSON.stringify(data.surahNumbers));
@@ -352,11 +372,11 @@ export async function toggleFavorite(userId: string, surahNumber: number): Promi
   if (isConfigured && db) {
     try {
       const docRef = doc(db, 'user_favorites', userId);
-      await setDoc(docRef, {
+      await withTimeout(setDoc(docRef, {
         userId,
         surahNumbers: updated,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }, { merge: true }), 2000);
     } catch (err) {
       console.warn('Firestore favorites update failed:', err);
     }
@@ -393,8 +413,8 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
   if (isConfigured && db) {
     try {
       const docRef = doc(db, 'user_settings', userId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
+      const snap = await withTimeout(getDoc(docRef), 2000);
+      if (snap && snap.exists()) {
         const remoteSettings = snap.data() as UserSettings;
         const merged = { ...localSettings, ...remoteSettings };
         localStorage.setItem(STORAGE_KEY_USER_SETTINGS, JSON.stringify(merged));
@@ -418,11 +438,11 @@ export async function saveUserSettings(userId: string, settings: Partial<UserSet
   if (isConfigured && db) {
     try {
       const docRef = doc(db, 'user_settings', userId);
-      await setDoc(docRef, {
+      await withTimeout(setDoc(docRef, {
         ...updated,
         userId,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }, { merge: true }), 2000);
     } catch (err) {
       console.warn('Firestore settings save failed:', err);
     }
