@@ -152,11 +152,11 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   };
 
-  const handleSeekCommit = () => {
+  const handleSeekCommit = useCallback(() => {
     if (audioRef.current) {
       persistProgress(audioRef.current.currentTime);
     }
-  };
+  }, [persistProgress]);
 
   const handleSkip = useCallback((seconds: number) => {
     if (!audioRef.current) return;
@@ -257,18 +257,22 @@ export const AudioPlayer: React.FC<Props> = ({
     };
   }, [track, userId]);
 
-  // MediaSession API Integration
+  // MediaSession API Integration for Lock Screen and Notification Menu
   useEffect(() => {
     if ('mediaSession' in navigator && track) {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
       navigator.mediaSession.metadata = new MediaMetadata({
         title: `${track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}${track.name} (${track.arabicName})`,
         artist: track.reciterName,
-        album: 'The Holy Quran',
+        album: 'The Holy Quran - القرآن الكريم',
         artwork: [
-          { src: track.artwork_url || '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: track.artwork_url || '/pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+          { src: `${origin}/pwa-192x192.png`, sizes: '192x192', type: 'image/png' },
+          { src: `${origin}/pwa-512x512.png`, sizes: '512x512', type: 'image/png' },
+          { src: `${origin}/apple-touch-icon.png`, sizes: '180x180', type: 'image/png' }
         ]
       });
+
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
       navigator.mediaSession.setActionHandler('play', () => handleTogglePlay());
       navigator.mediaSession.setActionHandler('pause', () => handleTogglePlay());
@@ -276,8 +280,43 @@ export const AudioPlayer: React.FC<Props> = ({
       navigator.mediaSession.setActionHandler('nexttrack', onNextTrack);
       navigator.mediaSession.setActionHandler('seekbackward', () => handleSkip(-10));
       navigator.mediaSession.setActionHandler('seekforward', () => handleSkip(10));
+
+      try {
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime !== undefined && !isNaN(details.seekTime)) {
+            handleSeek(details.seekTime);
+            handleSeekCommit();
+          }
+        });
+      } catch (e) {
+        console.warn('MediaSession seekto not supported:', e);
+      }
+
+      try {
+        navigator.mediaSession.setActionHandler('stop', () => {
+          if (audioRef.current) audioRef.current.pause();
+          setIsPlaying(false);
+        });
+      } catch (e) {
+        console.warn('MediaSession stop handler error:', e);
+      }
     }
-  }, [track, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip]);
+  }, [track, isPlaying, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip, handleSeekCommit]);
+
+  // Sync position state with system lock screen scrubber
+  useEffect(() => {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && duration > 0 && !isNaN(duration)) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(0, duration),
+          playbackRate: playbackSpeed || 1.0,
+          position: Math.max(0, Math.min(currentTime, duration))
+        });
+      } catch {
+        // Ignore minor rounding sync errors
+      }
+    }
+  }, [currentTime, duration, playbackSpeed]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -336,6 +375,8 @@ export const AudioPlayer: React.FC<Props> = ({
         ref={audioRef}
         src={track.stream_url}
         preload="metadata"
+        playsInline={true}
+        crossOrigin="anonymous"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onWaiting={() => setIsBuffering(true)}

@@ -28,7 +28,7 @@ export const App: React.FC = () => {
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(() => initializeFirebase().isConfigured);
   const [selectedReciter, setSelectedReciter] = useState<Reciter>(RECITERS[0]);
   const [tracks, setTracks] = useState<Track[]>(() => getTracksForReciter(RECITERS[0]));
-  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
+  const [activeTrack, setActiveTrack] = useState<Track | null>(() => getTracksForReciter(RECITERS[0])[0]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [progressMap, setProgressMap] = useState<Record<string, ListeningProgress>>({});
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
@@ -68,12 +68,27 @@ export const App: React.FC = () => {
         setLastSession(session);
         setFavorites(favs);
 
+        let reciterToUse = RECITERS[0];
         if (settings?.preferredReciterId) {
-          const reciter = RECITERS.find(r => r.id === settings.preferredReciterId);
-          if (reciter) {
-            setSelectedReciter(reciter);
-            setTracks(getTracksForReciter(reciter));
+          const found = RECITERS.find(r => r.id === settings.preferredReciterId);
+          if (found) reciterToUse = found;
+        } else if (session?.reciterId) {
+          const found = RECITERS.find(r => r.id === session.reciterId);
+          if (found) reciterToUse = found;
+        }
+        
+        setSelectedReciter(reciterToUse);
+        const reciterTracks = getTracksForReciter(reciterToUse);
+        setTracks(reciterTracks);
+
+        // Always ensure an active track is loaded for the persistent player bar
+        if (session && session.surahNumber > 0) {
+          const surah = SURAH_METADATA.find(s => s.number === session.surahNumber);
+          if (surah) {
+            setActiveTrack(generateTrackForSurah(surah, reciterToUse));
           }
+        } else if (reciterTracks.length > 0) {
+          setActiveTrack(reciterTracks[0]);
         }
       } catch (err) {
         console.error('Error initializing tracker data:', err);
