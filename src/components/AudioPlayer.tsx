@@ -127,17 +127,6 @@ export const AudioPlayer: React.FC<Props> = ({
     if (dur && !isNaN(dur)) {
       setDuration(dur);
     }
-    if (isPlaying) {
-      audioRef.current
-        .play()
-        .then(() => {
-          persistProgress(audioRef.current?.currentTime || 0);
-        })
-        .catch((e) => {
-          console.warn('Autoplay prevented:', e);
-          onPlayStateChange(false);
-        });
-    }
   };
 
   const handleTogglePlay = useCallback(() => {
