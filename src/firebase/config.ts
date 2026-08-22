@@ -49,6 +49,20 @@ export function getSavedFirebaseConfig(): FirebaseConfigState {
 
 export function saveFirebaseConfig(config: FirebaseConfigState) {
   localStorage.setItem(STORAGE_KEY_FIREBASE_CONFIG, JSON.stringify(config));
+  app = null;
+  db = null;
+  storage = null;
+}
+
+export function hasCustomFirebaseConfig(): boolean {
+  return Boolean(localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG));
+}
+
+export function clearFirebaseConfig() {
+  localStorage.removeItem(STORAGE_KEY_FIREBASE_CONFIG);
+  app = null;
+  db = null;
+  storage = null;
 }
 
 let app: FirebaseApp | null = null;

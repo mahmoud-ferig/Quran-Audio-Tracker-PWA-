@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Cloud, Database, Music } from 'lucide-react';
+import { X, Copy, Check, Cloud, Database, Music, Trash2, ExternalLink } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
-import { getSavedFirebaseConfig, saveFirebaseConfig } from '../firebase/config';
+import { 
+  getSavedFirebaseConfig, 
+  saveFirebaseConfig, 
+  clearFirebaseConfig, 
+  hasCustomFirebaseConfig 
+} from '../firebase/config';
 import { setCustomUserId } from '../services/storage';
 import { getSoundCloudClientId, setSoundCloudClientId } from '../services/soundcloud';
 
@@ -26,6 +31,7 @@ export const SettingsModal: React.FC<Props> = ({
   const [scClientId, setScClientId] = useState(() => getSoundCloudClientId());
 
   const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getSavedFirebaseConfig());
+  const [isCustomConfig, setIsCustomConfig] = useState(() => hasCustomFirebaseConfig());
 
   if (!isOpen) return null;
 
@@ -38,9 +44,27 @@ export const SettingsModal: React.FC<Props> = ({
   const handleSaveFirebase = (e: React.FormEvent) => {
     e.preventDefault();
     saveFirebaseConfig(fbConfig);
+    setIsCustomConfig(true);
     onConfigUpdated();
-    alert('Firebase settings saved! Syncing initialized.');
+    alert('Custom Firebase settings saved! Syncing initialized with your database.');
     onClose();
+  };
+
+  const handleClearFirebase = () => {
+    if (confirm('Disconnect your custom Firebase backend and revert to local mode?')) {
+      clearFirebaseConfig();
+      setFbConfig({
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: ''
+      });
+      setIsCustomConfig(false);
+      onConfigUpdated();
+      alert('Firebase backend disconnected. App is now running in local offline mode.');
+    }
   };
 
   const handleSaveSoundCloud = (e: React.FormEvent) => {
@@ -78,7 +102,7 @@ export const SettingsModal: React.FC<Props> = ({
             onClick={() => setActiveTab('firebase')}
           >
             <Cloud size={14} style={{ marginRight: 6 }} />
-            Firebase Firestore
+            Firebase Database
           </button>
 
           <button
@@ -104,72 +128,106 @@ export const SettingsModal: React.FC<Props> = ({
         {activeTab === 'firebase' && (
           <form onSubmit={handleSaveFirebase}>
             <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
+              background: fbConfig.projectId ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${fbConfig.projectId ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-subtle)'}`,
               borderRadius: '10px',
               padding: '12px 14px',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '10px'
             }}>
-              <Check size={18} color="var(--accent-emerald)" />
-              <div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  Cloud Firestore Connected
-                </div>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Project: {fbConfig.projectId || 'quran-audio-tracker-app'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {fbConfig.projectId ? <Check size={18} color="var(--accent-emerald)" /> : <Cloud size={18} color="var(--text-muted)" />}
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {fbConfig.projectId ? (isCustomConfig ? 'Custom Firebase Backend Active' : 'Cloud Firestore Active') : 'Local Offline Mode (Default)'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {fbConfig.projectId ? `Project: ${fbConfig.projectId}` : 'No cloud backend connected. All progress saved locally on device.'}
+                  </div>
                 </div>
               </div>
+
+              {isCustomConfig && (
+                <button
+                  type="button"
+                  onClick={handleClearFirebase}
+                  className="icon-btn"
+                  title="Disconnect Custom Firebase"
+                  style={{ color: '#ef4444' }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Your playback progress and favorites are securely synchronized with Cloud Firestore using isolated user IDs.
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Want to sync your listening bookmarks across all your devices using your own private database? Enter your personal Firebase Web App configuration below:
             </p>
 
-            <details style={{ marginTop: '10px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-              <summary style={{ fontSize: '0.8rem', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '12px' }}>
-                Advanced: Custom Project Override
-              </summary>
+            <div className="form-group">
+              <label className="form-label">Firebase API Key</label>
+              <input
+                type="password"
+                className="form-input"
+                placeholder="AIzaSy..."
+                value={fbConfig.apiKey}
+                onChange={(e) => setFbConfig({ ...fbConfig, apiKey: e.target.value })}
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Firebase API Key</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="AIzaSy..."
-                  value={fbConfig.apiKey}
-                  onChange={(e) => setFbConfig({ ...fbConfig, apiKey: e.target.value })}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Project ID</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. my-quran-app"
+                value={fbConfig.projectId}
+                onChange={(e) => setFbConfig({ ...fbConfig, projectId: e.target.value })}
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Project ID</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="my-quran-app"
-                  value={fbConfig.projectId}
-                  onChange={(e) => setFbConfig({ ...fbConfig, projectId: e.target.value })}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">App ID</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 1:123456789:web:abcdef"
+                value={fbConfig.appId}
+                onChange={(e) => setFbConfig({ ...fbConfig, appId: e.target.value })}
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">App ID</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="1:123456789:web:abcdef"
-                  value={fbConfig.appId}
-                  onChange={(e) => setFbConfig({ ...fbConfig, appId: e.target.value })}
-                />
-              </div>
-
-              <button type="submit" className="primary-btn" style={{ marginTop: '10px' }}>
-                Save Custom Configuration
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button type="submit" className="primary-btn" style={{ flex: 1 }}>
+                Save & Connect Backend
               </button>
-            </details>
+
+              {isCustomConfig && (
+                <button
+                  type="button"
+                  className="control-btn"
+                  onClick={handleClearFirebase}
+                  style={{ width: 'auto', padding: '0 14px', fontSize: '0.8rem', color: '#ef4444' }}
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
+
+            <div style={{ marginTop: '12px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>How to create your own free Firebase backend?</span>
+              <a
+                href="https://console.firebase.google.com"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--accent-emerald)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+              >
+                Firebase Console <ExternalLink size={10} />
+              </a>
+            </div>
           </form>
         )}
 
