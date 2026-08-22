@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChevronDown, 
   Play, 
@@ -15,9 +15,12 @@ import {
   Moon, 
   Star, 
   Loader2,
-  Share2
+  Share2,
+  Download,
+  CheckCircle2
 } from 'lucide-react';
 import type { Track, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
+import { isTrackDownloaded, downloadTrackForOffline, deleteDownloadedTrack } from '../services/offlineStorage';
 
 interface Props {
   isOpen: boolean;
@@ -84,8 +87,42 @@ export const FullScreenPlayer: React.FC<Props> = ({
   onToggleFavorite
 }) => {
   const [isSleepMenuOpen, setIsSleepMenuOpen] = useState(false);
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Check offline status on track change
+  useEffect(() => {
+    if (!track) return;
+    let isMounted = true;
+    isTrackDownloaded(track.stream_url).then((downloaded) => {
+      if (isMounted) setIsDownloaded(downloaded);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [track]);
 
   if (!isOpen || !track) return null;
+
+  const handleToggleDownload = async () => {
+    if (isDownloading) return;
+
+    if (isDownloaded) {
+      if (confirm(`Remove Surah ${track.name} from offline storage?`)) {
+        await deleteDownloadedTrack(track.stream_url);
+        setIsDownloaded(false);
+      }
+    } else {
+      setIsDownloading(true);
+      const success = await downloadTrackForOffline(track);
+      setIsDownloading(false);
+      if (success) {
+        setIsDownloaded(true);
+      } else {
+        alert('Could not download Surah. Please check your internet connection and try again.');
+      }
+    }
+  };
 
   const formatTime = (timeInSec: number) => {
     if (!timeInSec || isNaN(timeInSec)) return '0:00';
@@ -133,6 +170,19 @@ export const FullScreenPlayer: React.FC<Props> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className={`icon-btn ${isDownloaded ? 'active-downloaded' : ''}`}
+              onClick={handleToggleDownload}
+              title={isDownloaded ? 'Downloaded for Offline Playback ✓ (Click to remove)' : 'Download Surah for 100% Offline Playback'}
+            >
+              {isDownloading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : isDownloaded ? (
+                <CheckCircle2 size={18} color="var(--accent-emerald)" />
+              ) : (
+                <Download size={18} />
+              )}
+            </button>
             <button 
               className={`icon-btn ${isFavorite ? 'active-star' : ''}`}
               onClick={onToggleFavorite}
