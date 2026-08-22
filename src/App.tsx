@@ -6,7 +6,9 @@ import {
   getAllProgress, 
   getLastSession,
   getFavorites,
-  toggleFavorite
+  toggleFavorite,
+  getUserSettings,
+  saveUserSettings
 } from './services/storage';
 import { initializeFirebase } from './firebase/config';
 import { Header } from './components/Header';
@@ -32,19 +34,27 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCustomStreamOpen, setIsCustomStreamOpen] = useState(false);
 
-  // 1. Initial Load
+  // 1. Initial & Account Change Load
   useEffect(() => {
-    // Load user progress and favorites
     const initData = async () => {
       try {
-        const [prog, session, favs] = await Promise.all([
+        const [prog, session, favs, settings] = await Promise.all([
           getAllProgress(userId),
           getLastSession(userId),
-          getFavorites(userId)
+          getFavorites(userId),
+          getUserSettings(userId)
         ]);
         setProgressMap(prog);
         setLastSession(session);
         setFavorites(favs);
+
+        if (settings?.preferredReciterId) {
+          const reciter = RECITERS.find(r => r.id === settings.preferredReciterId);
+          if (reciter) {
+            setSelectedReciter(reciter);
+            setTracks(getTracksForReciter(reciter));
+          }
+        }
       } catch (err) {
         console.error('Error initializing tracker data:', err);
       }
@@ -58,6 +68,7 @@ export const App: React.FC = () => {
     setSelectedReciter(reciter);
     const newTracks = getTracksForReciter(reciter);
     setTracks(newTracks);
+    saveUserSettings(userId, { preferredReciterId: reciter.id });
 
     // If currently playing a track from another reciter, switch active track to the new reciter's stream
     if (activeTrack && activeTrack.surahNumber > 0) {

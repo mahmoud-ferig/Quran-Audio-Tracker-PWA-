@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Cloud, HardDrive, Radio, Disc } from 'lucide-react';
+import { Settings, Cloud, HardDrive, Radio, Disc, User, Mail } from 'lucide-react';
 
 interface Props {
   isConfigured: boolean;
@@ -14,6 +14,8 @@ export const Header: React.FC<Props> = ({
   onOpenCustomStream,
   userId
 }) => {
+  const isEmail = userId.includes('@');
+
   return (
     <header className="app-header">
       <div className="brand-logo">
@@ -22,9 +24,26 @@ export const Header: React.FC<Props> = ({
         </div>
         <div>
           <div style={{ lineHeight: 1.1 }}>Quran Audio Tracker</div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-            Sync ID: {userId.substring(0, 10)}...
-          </span>
+          <button
+            onClick={onOpenSettings}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              color: isEmail ? 'var(--accent-emerald)' : 'var(--text-muted)',
+              fontWeight: 500,
+              textAlign: 'left'
+            }}
+            title={isEmail ? `Logged in as ${userId}` : 'Click to link your email for multi-device sync'}
+          >
+            {isEmail ? <Mail size={11} /> : <User size={11} />}
+            <span>{isEmail ? userId : `Guest (${userId.substring(0, 8)})`}</span>
+          </button>
         </div>
       </div>
 

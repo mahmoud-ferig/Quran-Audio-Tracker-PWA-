@@ -10,5 +10,10 @@ service cloud.firestore {
     match /user_favorites/{userId} {
       allow read, write: if true;
     }
+
+    // Allow users to read and write their personal settings
+    match /user_settings/{userId} {
+      allow read, write: if true;
+    }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Cloud, Database, Music, Trash2, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Cloud, Music, Trash2, ExternalLink, Mail, UserCheck, LogOut } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
 import { 
   getSavedFirebaseConfig, 
@@ -7,7 +7,7 @@ import {
   clearFirebaseConfig, 
   hasCustomFirebaseConfig 
 } from '../firebase/config';
-import { setCustomUserId } from '../services/storage';
+import { setUserEmail, removeUserEmail, migrateUserData, getUserEmail } from '../services/storage';
 import { getSoundCloudClientId, setSoundCloudClientId } from '../services/soundcloud';
 
 interface Props {
@@ -25,20 +25,56 @@ export const SettingsModal: React.FC<Props> = ({
   onUserIdChanged,
   onConfigUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<'firebase' | 'soundcloud' | 'user'>('firebase');
+  const [activeTab, setActiveTab] = useState<'account' | 'firebase' | 'soundcloud'>('account');
   const [copied, setCopied] = useState(false);
-  const [inputUserId, setInputUserId] = useState(userId);
+  const [emailInput, setEmailInput] = useState(() => getUserEmail() || (userId.includes('@') ? userId : ''));
   const [scClientId, setScClientId] = useState(() => getSoundCloudClientId());
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getSavedFirebaseConfig());
   const [isCustomConfig, setIsCustomConfig] = useState(() => hasCustomFirebaseConfig());
 
   if (!isOpen) return null;
 
+  const isEmailLinked = userId.includes('@');
+
   const handleCopyUserId = () => {
     navigator.clipboard.writeText(userId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleLinkEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = emailInput.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsMigrating(true);
+      // Migrate local data to email account
+      await migrateUserData(userId, cleanEmail);
+      const newId = setUserEmail(cleanEmail);
+      onUserIdChanged(newId);
+      alert(`Account linked to ${cleanEmail}! Your progress and favorites are now synchronized to this email.`);
+      onClose();
+    } catch (err) {
+      console.error('Error linking email account:', err);
+      alert('Error saving email account. Please try again.');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    if (confirm('Sign out from this email account on this device? A new guest session will be created.')) {
+      const guestId = removeUserEmail();
+      setEmailInput('');
+      onUserIdChanged(guestId);
+      alert('Signed out. You are now using a local guest profile.');
+    }
   };
 
   const handleSaveFirebase = (e: React.FormEvent) => {
@@ -74,21 +110,11 @@ export const SettingsModal: React.FC<Props> = ({
     onClose();
   };
 
-  const handleUpdateUserId = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (inputUserId.trim()) {
-      setCustomUserId(inputUserId.trim());
-      onUserIdChanged(inputUserId.trim());
-      alert('Sync ID updated! Your progress will now sync with this ID.');
-      onClose();
-    }
-  };
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">Settings & Cloud Sync</div>
+          <div className="modal-title">Account & Settings</div>
           <button className="icon-btn" onClick={onClose} aria-label="Close modal">
             <X size={18} />
           </button>
@@ -97,21 +123,21 @@ export const SettingsModal: React.FC<Props> = ({
         {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
           <button
+            className={`control-btn ${activeTab === 'account' ? 'active' : ''}`}
+            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
+            onClick={() => setActiveTab('account')}
+          >
+            <Mail size={14} style={{ marginRight: 6 }} />
+            Account Sync
+          </button>
+
+          <button
             className={`control-btn ${activeTab === 'firebase' ? 'active' : ''}`}
             style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setActiveTab('firebase')}
           >
             <Cloud size={14} style={{ marginRight: 6 }} />
-            Firebase Database
-          </button>
-
-          <button
-            className={`control-btn ${activeTab === 'user' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
-            onClick={() => setActiveTab('user')}
-          >
-            <Database size={14} style={{ marginRight: 6 }} />
-            Sync ID
+            Database
           </button>
 
           <button
@@ -123,6 +149,98 @@ export const SettingsModal: React.FC<Props> = ({
             SoundCloud
           </button>
         </div>
+
+        {/* Account / Email Sync Tab */}
+        {activeTab === 'account' && (
+          <form onSubmit={handleLinkEmail}>
+            <div style={{
+              background: isEmailLinked ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${isEmailLinked ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-subtle)'}`,
+              borderRadius: '10px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {isEmailLinked ? <UserCheck size={18} color="var(--accent-emerald)" /> : <Mail size={18} color="var(--text-muted)" />}
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {isEmailLinked ? 'Email Profile Linked' : 'Guest Profile (Unlinked)'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {isEmailLinked ? `Account: ${userId}` : `Temporary ID: ${userId.substring(0, 12)}...`}
+                  </div>
+                </div>
+              </div>
+
+              {isEmailLinked && (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="icon-btn"
+                  title="Sign Out / Switch Profile"
+                  style={{ color: '#ef4444' }}
+                >
+                  <LogOut size={16} />
+                </button>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Link your email address to sync your listening position, favorite Surahs, and tracker seamlessly across your phone, tablet, and laptop.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">Your Email Address</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="email"
+                  required
+                  className="form-input"
+                  placeholder="e.g. name@example.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                />
+                {isEmailLinked && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={handleCopyUserId}
+                    title="Copy Email"
+                    style={{ height: '42px', width: '42px', flexShrink: 0 }}
+                  >
+                    {copied ? <Check size={18} color="var(--accent-emerald)" /> : <Copy size={18} />}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button 
+                type="submit" 
+                className="primary-btn" 
+                style={{ flex: 1 }}
+                disabled={isMigrating}
+              >
+                {isMigrating ? 'Syncing...' : (isEmailLinked ? 'Update Account Email' : 'Link & Sync Email')}
+              </button>
+
+              {isEmailLinked && (
+                <button
+                  type="button"
+                  className="control-btn"
+                  onClick={handleSignOut}
+                  style={{ width: 'auto', padding: '0 14px', fontSize: '0.8rem', color: '#ef4444' }}
+                >
+                  Sign Out
+                </button>
+              )}
+            </div>
+          </form>
+        )}
 
         {/* Firebase Config Tab */}
         {activeTab === 'firebase' && (
@@ -145,7 +263,7 @@ export const SettingsModal: React.FC<Props> = ({
                     {fbConfig.projectId ? (isCustomConfig ? 'Custom Firebase Backend Active' : 'Cloud Firestore Active') : 'Local Offline Mode (Default)'}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                    {fbConfig.projectId ? `Project: ${fbConfig.projectId}` : 'No cloud backend connected. All progress saved locally on device.'}
+                    {fbConfig.projectId ? `Project: ${fbConfig.projectId}` : 'All progress saved locally on device.'}
                   </div>
                 </div>
               </div>
@@ -164,7 +282,7 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Want to sync your listening bookmarks across all your devices using your own private database? Enter your personal Firebase Web App configuration below:
+              Want to sync your listening bookmarks with your own private Firebase database? Enter your personal Firebase Web App configuration below:
             </p>
 
             <div className="form-group">
@@ -228,40 +346,6 @@ export const SettingsModal: React.FC<Props> = ({
                 Firebase Console <ExternalLink size={10} />
               </a>
             </div>
-          </form>
-        )}
-
-        {/* Sync / User ID Tab */}
-        {activeTab === 'user' && (
-          <form onSubmit={handleUpdateUserId}>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Your unique Sync ID links your playback bookmarks. Enter the same Sync ID on your phone and laptop to share progress.
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Your Active Sync ID</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={inputUserId}
-                  onChange={(e) => setInputUserId(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={handleCopyUserId}
-                  title="Copy Sync ID"
-                  style={{ height: '42px', width: '42px', flexShrink: 0 }}
-                >
-                  {copied ? <Check size={18} color="var(--accent-emerald)" /> : <Copy size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <button type="submit" className="primary-btn">
-              Apply Sync ID
-            </button>
           </form>
         )}
 

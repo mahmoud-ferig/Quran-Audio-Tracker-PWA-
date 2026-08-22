@@ -1,19 +1,52 @@
 import { initializeFirebase, doc, getDoc, setDoc, getDocs, collection, query, where } from '../firebase/config';
-import type { ListeningProgress, LastSession } from '../types';
+import type { ListeningProgress, LastSession, UserSettings } from '../types';
 
 const STORAGE_KEY_USER_ID = 'quran_tracker_user_id';
+const STORAGE_KEY_USER_EMAIL = 'quran_tracker_user_email';
+const STORAGE_KEY_USER_SETTINGS = 'quran_tracker_user_settings';
 const STORAGE_KEY_LOCAL_PROGRESS = 'quran_tracker_local_progress';
 const STORAGE_KEY_LOCAL_LAST_SESSION = 'quran_tracker_local_last_session';
 const STORAGE_KEY_LOCAL_FAVORITES = 'quran_tracker_local_favorites';
 const STORAGE_KEY_AUTOPLAY = 'quran_tracker_autoplay';
 
 /**
- * Get or generate a persistent unique User ID for syncing across devices
+ * Get User Email if linked
+ */
+export function getUserEmail(): string | null {
+  const email = localStorage.getItem(STORAGE_KEY_USER_EMAIL);
+  return email ? email.trim().toLowerCase() : null;
+}
+
+/**
+ * Link User Email and set as primary identity
+ */
+export function setUserEmail(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  localStorage.setItem(STORAGE_KEY_USER_EMAIL, normalized);
+  localStorage.setItem(STORAGE_KEY_USER_ID, normalized);
+  return normalized;
+}
+
+/**
+ * Remove User Email and revert to local guest ID
+ */
+export function removeUserEmail(): string {
+  localStorage.removeItem(STORAGE_KEY_USER_EMAIL);
+  const guestId = 'guest_' + Math.random().toString(36).substring(2, 10);
+  localStorage.setItem(STORAGE_KEY_USER_ID, guestId);
+  return guestId;
+}
+
+/**
+ * Get or generate a persistent unique User ID or Email for syncing
  */
 export function getOrCreateUserId(): string {
+  const email = getUserEmail();
+  if (email) return email;
+
   let userId = localStorage.getItem(STORAGE_KEY_USER_ID);
   if (!userId) {
-    userId = 'user_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    userId = 'guest_' + Math.random().toString(36).substring(2, 10);
     localStorage.setItem(STORAGE_KEY_USER_ID, userId);
   }
   return userId;
@@ -21,7 +54,12 @@ export function getOrCreateUserId(): string {
 
 export function setCustomUserId(newId: string): void {
   if (newId.trim()) {
-    localStorage.setItem(STORAGE_KEY_USER_ID, newId.trim());
+    const trimmed = newId.trim();
+    if (trimmed.includes('@')) {
+      setUserEmail(trimmed);
+    } else {
+      localStorage.setItem(STORAGE_KEY_USER_ID, trimmed);
+    }
   }
 }
 
@@ -43,6 +81,66 @@ function saveLocalProgressMap(map: Record<string, ListeningProgress>): void {
     localStorage.setItem(STORAGE_KEY_LOCAL_PROGRESS, JSON.stringify(map));
   } catch (e) {
     console.error('Error saving local progress map:', e);
+  }
+}
+
+/**
+ * Migrate local progress, favorites, and settings from old ID to new Email ID
+ */
+export async function migrateUserData(fromUserId: string, toEmail: string): Promise<void> {
+  const normalizedEmail = toEmail.trim().toLowerCase();
+  if (!fromUserId || fromUserId === normalizedEmail) return;
+
+  const localMap = getLocalProgressMap();
+  const favorites = getLocalFavorites();
+  const lastSession = await getLastSession(fromUserId);
+
+  // Sync all to the new email ID
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const promises: Promise<any>[] = [];
+
+      // Migrate Progress records
+      for (const trackId in localMap) {
+        const prog = localMap[trackId];
+        const docKey = `${normalizedEmail}_${trackId}`;
+        const docRef = doc(db, 'listening_progress', docKey);
+        promises.push(setDoc(docRef, {
+          userId: normalizedEmail,
+          trackId: prog.trackId,
+          surahNumber: prog.surahNumber,
+          reciterId: prog.reciterId,
+          currentTime: prog.currentTime,
+          duration: prog.duration,
+          percentage: prog.percentage,
+          updatedAt: prog.updatedAt
+        }, { merge: true }));
+      }
+
+      // Migrate Favorites
+      if (favorites.length > 0) {
+        const favDoc = doc(db, 'user_favorites', normalizedEmail);
+        promises.push(setDoc(favDoc, {
+          userId: normalizedEmail,
+          surahNumbers: favorites,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }));
+      }
+
+      // Migrate Last Session
+      if (lastSession) {
+        const sessDoc = doc(db, 'listening_progress', `${normalizedEmail}_last_session`);
+        promises.push(setDoc(sessDoc, {
+          userId: normalizedEmail,
+          ...lastSession
+        }, { merge: true }));
+      }
+
+      await Promise.all(promises);
+    } catch (e) {
+      console.warn('Migration to email partial warning:', e);
+    }
   }
 }
 
@@ -277,4 +375,58 @@ export function getAutoplaySetting(): boolean {
 
 export function setAutoplaySetting(enabled: boolean): void {
   localStorage.setItem(STORAGE_KEY_AUTOPLAY, enabled ? 'true' : 'false');
+}
+
+/**
+ * User Preferences & Settings Management
+ */
+export async function getUserSettings(userId: string): Promise<UserSettings> {
+  let localSettings: UserSettings = {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_USER_SETTINGS);
+    if (raw) localSettings = JSON.parse(raw);
+  } catch (e) {
+    console.error('Error reading local user settings:', e);
+  }
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_settings', userId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const remoteSettings = snap.data() as UserSettings;
+        const merged = { ...localSettings, ...remoteSettings };
+        localStorage.setItem(STORAGE_KEY_USER_SETTINGS, JSON.stringify(merged));
+        return merged;
+      }
+    } catch (err) {
+      console.warn('Firestore settings fetch failed, using local cache:', err);
+    }
+  }
+
+  return localSettings;
+}
+
+export async function saveUserSettings(userId: string, settings: Partial<UserSettings>): Promise<UserSettings> {
+  const current = await getUserSettings(userId);
+  const updated: UserSettings = { ...current, ...settings };
+
+  localStorage.setItem(STORAGE_KEY_USER_SETTINGS, JSON.stringify(updated));
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_settings', userId);
+      await setDoc(docRef, {
+        ...updated,
+        userId,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore settings save failed:', err);
+    }
+  }
+
+  return updated;
 }

@@ -58,3 +58,18 @@ export type PlaybackSpeed = 0.75 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0;
 export type RepeatMode = 'none' | 'one' | 'all';
 
 export type SleepTimerOption = 0 | 15 | 30 | 45 | 60 | 'surah';
+
+export interface UserSettings {
+  preferredReciterId?: string;
+  playbackSpeed?: PlaybackSpeed;
+  autoplayNext?: boolean;
+  repeatMode?: RepeatMode;
+  sleepTimer?: SleepTimerOption;
+}
+
+export interface UserProfile {
+  email: string;
+  displayName?: string;
+  settings?: UserSettings;
+  updatedAt?: string;
+}
