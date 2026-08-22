@@ -5,7 +5,8 @@ import {
   SkipBack, 
   SkipForward, 
   Loader2,
-  ChevronUp
+  ChevronUp,
+  Star
 } from 'lucide-react';
 import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
 import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting } from '../services/storage';
@@ -55,6 +56,21 @@ export const AudioPlayer: React.FC<Props> = ({
   const [sleepRemainingSeconds, setSleepRemainingSeconds] = useState<number | null>(null);
 
   const lastSavedTimeRef = useRef<number>(0);
+
+  // References to keep mediaSession callbacks fully stable
+  const onNextTrackRef = useRef(onNextTrack);
+  const onPrevTrackRef = useRef(onPrevTrack);
+  const onPlayStateChangeRef = useRef(onPlayStateChange);
+  const isPlayingRef = useRef(isPlaying);
+  const trackRef = useRef(track);
+
+  useEffect(() => {
+    onNextTrackRef.current = onNextTrack;
+    onPrevTrackRef.current = onPrevTrack;
+    onPlayStateChangeRef.current = onPlayStateChange;
+    isPlayingRef.current = isPlaying;
+    trackRef.current = track;
+  });
 
   // Helper to format mm:ss or hh:mm:ss
   const formatTime = (timeInSec: number) => {
@@ -109,7 +125,11 @@ export const AudioPlayer: React.FC<Props> = ({
     [track, duration, userId, onProgressUpdated]
   );
 
-  // Audio Event Handlers & Controls
+  const persistProgressRef = useRef(persistProgress);
+  useEffect(() => {
+    persistProgressRef.current = persistProgress;
+  }, [persistProgress]);
+
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
     const now = audioRef.current.currentTime;
@@ -155,12 +175,6 @@ export const AudioPlayer: React.FC<Props> = ({
       audioRef.current.currentTime = time;
     }
   }, []);
-
-  const handleSeekCommit = useCallback(() => {
-    if (audioRef.current) {
-      persistProgress(audioRef.current.currentTime);
-    }
-  }, [persistProgress]);
 
   const handleSkip = useCallback((seconds: number) => {
     if (!audioRef.current) return;
@@ -209,7 +223,7 @@ export const AudioPlayer: React.FC<Props> = ({
     if (repeatMode === 'one') {
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
-        audioRef.current.play();
+        audioRef.current.play().catch(() => {});
       }
     } else if (repeatMode === 'all' || autoplayNext) {
       onNextTrack();
@@ -218,13 +232,15 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   };
 
-  // Play / Pause side-effect sync
+  // Play / Pause side-effect sync from React props
   useEffect(() => {
     if (!audioRef.current || !track) return;
     if (isPlaying) {
       audioRef.current.play().catch(() => {
         onPlayStateChange(false);
       });
+    } else {
+      audioRef.current.pause();
     }
   }, [track, isPlaying, onPlayStateChange]);
 
@@ -271,22 +287,13 @@ export const AudioPlayer: React.FC<Props> = ({
     };
   }, [track, userId]);
 
-  const onNextTrackRef = useRef(onNextTrack);
-  const onPrevTrackRef = useRef(onPrevTrack);
-  const onPlayStateChangeRef = useRef(onPlayStateChange);
-  const persistProgressRef = useRef(persistProgress);
-
+  // Stable MediaSession Metadata Registration (Runs ONLY when track changes)
   useEffect(() => {
-    onNextTrackRef.current = onNextTrack;
-    onPrevTrackRef.current = onPrevTrack;
-    onPlayStateChangeRef.current = onPlayStateChange;
-    persistProgressRef.current = persistProgress;
-  });
+    if (!('mediaSession' in navigator) || !track) return;
 
-  // MediaSession API Integration for Lock Screen and Notification Menu
-  useEffect(() => {
-    if ('mediaSession' in navigator && track) {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    
+    try {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: `${track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}${track.name} (${track.arabicName})`,
         artist: track.reciterName,
@@ -298,28 +305,12 @@ export const AudioPlayer: React.FC<Props> = ({
         ]
       });
 
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
       navigator.mediaSession.setActionHandler('play', () => {
-        if (audioRef.current) {
-          audioRef.current.play().then(() => {
-            onPlayStateChangeRef.current(true);
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-          }).catch(e => console.error('MediaSession play error:', e));
-        }
+        audioRef.current?.play().catch(() => {});
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        onPlayStateChangeRef.current(false);
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.playbackState = 'paused';
-        }
-        persistProgressRef.current();
+        audioRef.current?.pause();
       });
 
       navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -331,39 +322,34 @@ export const AudioPlayer: React.FC<Props> = ({
       });
 
       navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-        const skip = details.seekOffset || 10;
-        handleSkip(-skip);
+        if (!audioRef.current) return;
+        const skip = details?.seekOffset || 10;
+        const target = Math.max(0, audioRef.current.currentTime - skip);
+        audioRef.current.currentTime = target;
+        setCurrentTime(target);
       });
 
       navigator.mediaSession.setActionHandler('seekforward', (details) => {
-        const skip = details.seekOffset || 10;
-        handleSkip(skip);
+        if (!audioRef.current) return;
+        const skip = details?.seekOffset || 10;
+        const target = Math.min(audioRef.current.duration || 9999, audioRef.current.currentTime + skip);
+        audioRef.current.currentTime = target;
+        setCurrentTime(target);
       });
 
       try {
         navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (details.seekTime !== undefined && !isNaN(details.seekTime)) {
-            handleSeek(details.seekTime);
-            handleSeekCommit();
+          if (audioRef.current && details.seekTime !== undefined && !isNaN(details.seekTime)) {
+            audioRef.current.currentTime = details.seekTime;
+            setCurrentTime(details.seekTime);
+            persistProgressRef.current(details.seekTime);
           }
         });
-      } catch (e) {
-        console.warn('MediaSession seekto not supported:', e);
-      }
-
-      try {
-        navigator.mediaSession.setActionHandler('stop', () => {
-          if (audioRef.current) audioRef.current.pause();
-          onPlayStateChangeRef.current(false);
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'none';
-          }
-        });
-      } catch (e) {
-        console.warn('MediaSession stop handler error:', e);
-      }
+      } catch {}
+    } catch (e) {
+      console.warn('Error setting MediaSession metadata:', e);
     }
-  }, [track, isPlaying, handleSkip, handleSeek, handleSeekCommit]);
+  }, [track]);
 
   // Sync position state with system lock screen scrubber
   useEffect(() => {
@@ -400,9 +386,29 @@ export const AudioPlayer: React.FC<Props> = ({
           e.preventDefault();
           handleSkip(-10);
           break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setVolume(prev => {
+            const next = Math.min(1, prev + 0.1);
+            if (audioRef.current) audioRef.current.volume = next;
+            return next;
+          });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setVolume(prev => {
+            const next = Math.max(0, prev - 0.1);
+            if (audioRef.current) audioRef.current.volume = next;
+            return next;
+          });
+          break;
         case 'KeyM':
           e.preventDefault();
           toggleMute();
+          break;
+        case 'KeyF':
+          e.preventDefault();
+          setIsFullScreenOpen(prev => !prev);
           break;
       }
     };
@@ -411,19 +417,14 @@ export const AudioPlayer: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, handleSkip, toggleMute]);
 
-  // Volume Sync
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
   if (!track) return null;
 
   const DEFAULT_QURAN_ARTWORK = `data:image/svg+xml;utf8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <rect width="120" height="120" rx="32" fill="#059669"/>
-  <circle cx="60" cy="60" r="46" fill="#047857" stroke="#f59e0b" stroke-width="3"/>
+  <rect width="120" height="120" rx="24" fill="#059669"/>
+  <circle cx="60" cy="60" r="44" fill="none" stroke="#d97706" stroke-width="2"/>
+  <circle cx="60" cy="60" r="36" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <polygon points="60,28 69,51 93,60 69,69 60,92 51,69 27,60 51,51" fill="#d97706" opacity="0.9"/>
   <circle cx="60" cy="60" r="24" fill="#ffffff"/>
   <circle cx="60" cy="60" r="10" fill="#059669"/>
 </svg>
@@ -480,28 +481,50 @@ export const AudioPlayer: React.FC<Props> = ({
         />
 
         <div className="mini-player-inner">
-          {/* Left: Artwork & Info */}
+          {/* Left: Artwork Medallion & Info */}
           <div className="mini-player-info">
-            <img
-              src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
-              alt={track.name}
-              className="mini-player-artwork"
-            />
+            <div className="mini-player-medallion">
+              <img
+                src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
+                alt={track.name}
+                className="mini-player-artwork"
+              />
+              {isPlaying && !isBuffering && (
+                <div className="mini-player-wave-overlay">
+                  <span className="mini-wave-bar bar-1"></span>
+                  <span className="mini-wave-bar bar-2"></span>
+                  <span className="mini-wave-bar bar-3"></span>
+                </div>
+              )}
+            </div>
+
             <div className="mini-player-text">
-              <div className="mini-player-title">
-                {track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}{track.name}
+              <div className="mini-player-title-row">
+                <span className="mini-player-title">
+                  {track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}{track.name}
+                </span>
                 <span className="mini-player-arabic arabic-text">{track.arabicName}</span>
               </div>
               <div className="mini-player-sub">
-                {track.reciterName} • {formatTime(currentTime)} / {formatTime(duration)}
+                <span className="mini-reciter-name">{track.reciterName}</span>
+                <span className="mini-dot-sep">•</span>
+                <span className="mini-time-text">{formatTime(currentTime)} / {formatTime(duration)}</span>
               </div>
             </div>
           </div>
 
           {/* Right: Quick Action Controls */}
           <div className="mini-player-actions" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className={`mini-icon-btn favorite-mini-btn ${isFavorite ? 'active-star' : ''}`}
+              onClick={onToggleFavorite}
+              title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+            >
+              <Star size={16} fill={isFavorite ? 'var(--accent-gold)' : 'none'} color={isFavorite ? 'var(--accent-gold)' : 'currentColor'} />
+            </button>
+
             <button
-              className="mini-action-btn"
+              className="mini-icon-btn"
               onClick={onPrevTrack}
               title="Previous Surah"
               aria-label="Previous Surah"
@@ -525,7 +548,7 @@ export const AudioPlayer: React.FC<Props> = ({
             </button>
 
             <button
-              className="mini-action-btn"
+              className="mini-icon-btn"
               onClick={onNextTrack}
               title="Next Surah"
               aria-label="Next Surah"
@@ -533,19 +556,18 @@ export const AudioPlayer: React.FC<Props> = ({
               <SkipForward size={18} />
             </button>
 
-            <button
-              className="mini-action-btn expand-btn"
+            <button 
+              className="mini-expand-btn" 
               onClick={() => setIsFullScreenOpen(true)}
-              title="Expand Player"
-              aria-label="Expand Player"
+              title="Expand Full Screen Player"
             >
-              <ChevronUp size={20} />
+              <ChevronUp size={18} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Expandable Full-Screen Sheet */}
+      {/* Expandable Full-Screen Sheet Modal */}
       <FullScreenPlayer
         isOpen={isFullScreenOpen}
         onClose={() => setIsFullScreenOpen(false)}
@@ -562,23 +584,28 @@ export const AudioPlayer: React.FC<Props> = ({
         isMuted={isMuted}
         isFavorite={isFavorite}
         onTogglePlay={handleTogglePlay}
-        onSeek={(t) => {
-          handleSeek(t);
-          handleSeekCommit();
-        }}
+        onSeek={handleSeek}
         onSkip={handleSkip}
         onNextTrack={onNextTrack}
         onPrevTrack={onPrevTrack}
         onCycleSpeed={cycleSpeed}
         onToggleRepeat={toggleRepeat}
-        onSetSleepTimer={(opt) => {
-          setSleepTimer(opt);
-          setSleepRemainingSeconds(typeof opt === 'number' && opt > 0 ? opt * 60 : null);
+        onSetSleepTimer={(val) => {
+          setSleepTimer(val);
+          if (typeof val === 'number' && val > 0) {
+            setSleepRemainingSeconds(val * 60);
+          } else {
+            setSleepRemainingSeconds(null);
+          }
         }}
         onToggleMute={toggleMute}
-        onVolumeChange={(v) => {
-          setVolume(v);
-          if (isMuted && v > 0) setIsMuted(false);
+        onVolumeChange={(val) => {
+          setVolume(val);
+          if (audioRef.current) {
+            audioRef.current.volume = val;
+            audioRef.current.muted = false;
+          }
+          setIsMuted(false);
         }}
         onToggleFavorite={onToggleFavorite}
       />
