@@ -257,6 +257,8 @@ export const App: React.FC = () => {
       <AudioPlayer
         track={activeTrack}
         userId={userId}
+        isPlaying={isPlaying}
+        onPlayStateChange={setIsPlaying}
         isFavorite={activeTrack ? favorites.includes(activeTrack.surahNumber) : false}
         onToggleFavorite={() => {
           if (activeTrack && activeTrack.surahNumber > 0) {

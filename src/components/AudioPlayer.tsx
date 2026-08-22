@@ -14,6 +14,8 @@ import { FullScreenPlayer } from './FullScreenPlayer';
 interface Props {
   track: Track | null;
   userId: string;
+  isPlaying: boolean;
+  onPlayStateChange: (playing: boolean) => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onNextTrack: () => void;
@@ -26,6 +28,8 @@ const SPEED_OPTIONS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 export const AudioPlayer: React.FC<Props> = ({
   track,
   userId,
+  isPlaying,
+  onPlayStateChange,
   isFavorite = false,
   onToggleFavorite = () => {},
   onNextTrack,
@@ -34,7 +38,6 @@ export const AudioPlayer: React.FC<Props> = ({
 }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -124,13 +127,17 @@ export const AudioPlayer: React.FC<Props> = ({
     if (dur && !isNaN(dur)) {
       setDuration(dur);
     }
-    audioRef.current
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-        persistProgress(audioRef.current?.currentTime || 0);
-      })
-      .catch(() => setIsPlaying(false));
+    if (isPlaying) {
+      audioRef.current
+        .play()
+        .then(() => {
+          persistProgress(audioRef.current?.currentTime || 0);
+        })
+        .catch((e) => {
+          console.warn('Autoplay prevented:', e);
+          onPlayStateChange(false);
+        });
+    }
   };
 
   const handleTogglePlay = useCallback(() => {
@@ -138,12 +145,20 @@ export const AudioPlayer: React.FC<Props> = ({
 
     if (isPlaying) {
       audioRef.current.pause();
-      setIsPlaying(false);
+      onPlayStateChange(false);
       persistProgress();
     } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch((e) => console.error('Play error:', e));
+      audioRef.current
+        .play()
+        .then(() => {
+          onPlayStateChange(true);
+        })
+        .catch((e) => {
+          console.error('Play error:', e);
+          onPlayStateChange(false);
+        });
     }
-  }, [isPlaying, persistProgress]);
+  }, [isPlaying, persistProgress, onPlayStateChange]);
 
   const handleSeek = (time: number) => {
     setCurrentTime(time);
@@ -196,7 +211,7 @@ export const AudioPlayer: React.FC<Props> = ({
     persistProgress(duration, true);
 
     if (sleepTimer === 'surah') {
-      setIsPlaying(false);
+      onPlayStateChange(false);
       setSleepTimer(0);
       setSleepRemainingSeconds(null);
       return;
@@ -210,9 +225,19 @@ export const AudioPlayer: React.FC<Props> = ({
     } else if (repeatMode === 'all' || autoplayNext) {
       onNextTrack();
     } else {
-      setIsPlaying(false);
+      onPlayStateChange(false);
     }
   };
+
+  // Play / Pause side-effect sync
+  useEffect(() => {
+    if (!audioRef.current || !track) return;
+    if (isPlaying) {
+      audioRef.current.play().catch(() => {
+        onPlayStateChange(false);
+      });
+    }
+  }, [track, isPlaying, onPlayStateChange]);
 
   // Sleep Timer Countdown Effect
   useEffect(() => {
@@ -227,7 +252,7 @@ export const AudioPlayer: React.FC<Props> = ({
           if (audioRef.current) {
             audioRef.current.pause();
           }
-          setIsPlaying(false);
+          onPlayStateChange(false);
           setSleepTimer(0);
           return null;
         }
@@ -236,7 +261,7 @@ export const AudioPlayer: React.FC<Props> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [sleepTimer, sleepRemainingSeconds]);
+  }, [sleepTimer, sleepRemainingSeconds, onPlayStateChange]);
 
   // Load initial track progress
   useEffect(() => {
@@ -295,13 +320,13 @@ export const AudioPlayer: React.FC<Props> = ({
       try {
         navigator.mediaSession.setActionHandler('stop', () => {
           if (audioRef.current) audioRef.current.pause();
-          setIsPlaying(false);
+          onPlayStateChange(false);
         });
       } catch (e) {
         console.warn('MediaSession stop handler error:', e);
       }
     }
-  }, [track, isPlaying, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip, handleSeekCommit]);
+  }, [track, isPlaying, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip, handleSeekCommit, onPlayStateChange]);
 
   // Sync position state with system lock screen scrubber
   useEffect(() => {
@@ -382,11 +407,11 @@ export const AudioPlayer: React.FC<Props> = ({
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
           setIsBuffering(false);
-          setIsPlaying(true);
+          onPlayStateChange(true);
         }}
         onCanPlay={() => setIsBuffering(false)}
         onPause={() => {
-          setIsPlaying(false);
+          onPlayStateChange(false);
           persistProgress();
         }}
         onEnded={handleTrackEnded}
