@@ -11,6 +11,8 @@ import {
   where,
   Firestore 
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import type { FirebaseStorage } from 'firebase/storage';
 import type { FirebaseConfigState } from '../types';
 
 const STORAGE_KEY_FIREBASE_CONFIG = 'quran_tracker_firebase_config';
@@ -51,13 +53,19 @@ export function saveFirebaseConfig(config: FirebaseConfigState) {
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
 
-export function initializeFirebase(): { app: FirebaseApp | null; db: Firestore | null; isConfigured: boolean } {
+export function initializeFirebase(): { 
+  app: FirebaseApp | null; 
+  db: Firestore | null; 
+  storage: FirebaseStorage | null; 
+  isConfigured: boolean 
+} {
   const config = getSavedFirebaseConfig();
   const isConfigured = Boolean(config.apiKey && config.projectId && config.appId);
 
   if (!isConfigured) {
-    return { app: null, db: null, isConfigured: false };
+    return { app: null, db: null, storage: null, isConfigured: false };
   }
 
   try {
@@ -67,11 +75,12 @@ export function initializeFirebase(): { app: FirebaseApp | null; db: Firestore |
       app = getApp();
     }
     db = getFirestore(app);
-    return { app, db, isConfigured: true };
+    storage = getStorage(app);
+    return { app, db, storage, isConfigured: true };
   } catch (error) {
     console.error('Firebase initialization error:', error);
-    return { app: null, db: null, isConfigured: false };
+    return { app: null, db: null, storage: null, isConfigured: false };
   }
 }
 
-export { doc, getDoc, setDoc, getDocs, collection, query, where };
+export { doc, getDoc, setDoc, getDocs, collection, query, where, getStorage };
