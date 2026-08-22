@@ -25,16 +25,16 @@ export const Header: React.FC<Props> = ({
     <header className="app-header">
       <div className="brand-logo">
         <div className="brand-icon">
-          <Disc size={20} className="animate-spin-slow" />
+          <Disc size={18} className="animate-spin-slow" />
         </div>
-        <div style={{ minWidth: 0 }}>
+        <div className="brand-text-container">
           <div className="brand-title">Quran Audio Tracker</div>
           <button
             onClick={onOpenSettings}
             className="user-profile-btn"
             title={isEmail ? `Logged in as ${userId}` : 'Click to link your email for multi-device sync'}
           >
-            {isEmail ? <Mail size={11} /> : <User size={11} />}
+            {isEmail ? <Mail size={10} /> : <User size={10} />}
             <span className="user-email-text">{isEmail ? userId : `Guest (${userId.substring(0, 8)})`}</span>
           </button>
         </div>
@@ -46,7 +46,7 @@ export const Header: React.FC<Props> = ({
           title={isConfigured ? 'Connected to Firebase Firestore' : 'Running in Offline Local Storage mode'}
         >
           {isConfigured ? <Cloud size={13} /> : <HardDrive size={13} />}
-          <span className="badge-text">{isConfigured ? 'Cloud Synced' : 'Local'}</span>
+          <span className="badge-text">{isConfigured ? 'Synced' : 'Local'}</span>
         </div>
 
         {/* Theme Toggle Button */}
@@ -56,7 +56,7 @@ export const Header: React.FC<Props> = ({
           title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
           aria-label="Toggle theme"
         >
-          {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+          {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
         <button
@@ -65,7 +65,7 @@ export const Header: React.FC<Props> = ({
           title="Add SoundCloud / Custom Stream"
           aria-label="Add SoundCloud or Custom Stream"
         >
-          <Radio size={17} />
+          <Radio size={16} />
         </button>
 
         <button
@@ -74,7 +74,7 @@ export const Header: React.FC<Props> = ({
           title="Settings & Sync"
           aria-label="Settings"
         >
-          <Settings size={17} />
+          <Settings size={16} />
         </button>
       </div>
     </header>

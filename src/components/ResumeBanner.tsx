@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Sparkles, Clock } from 'lucide-react';
+import { Play, Sparkles } from 'lucide-react';
 import type { LastSession } from '../types';
 
 interface Props {
@@ -22,42 +22,52 @@ export const ResumeBanner: React.FC<Props> = ({ session, onResume }) => {
     : 0;
 
   return (
-    <div className="resume-banner" onClick={() => onResume(session)} role="button" tabIndex={0}>
-      <div className="resume-info">
-        <div className="resume-tag">
-          <Sparkles size={14} className="sparkle-icon" />
-          <span>CONTINUE WHERE YOU LEFT OFF</span>
+    <div 
+      className="resume-banner-slim" 
+      onClick={() => onResume(session)} 
+      role="button" 
+      tabIndex={0}
+      title="Click to resume recitation"
+    >
+      <div className="resume-slim-left">
+        <div className="resume-slim-icon">
+          <Play size={14} fill="currentColor" style={{ marginLeft: 2 }} />
         </div>
-        <div className="resume-title">
-          <span className="resume-surah-english">{session.trackTitle || `Surah ${session.surahNumber}`}</span>
-          <span className="resume-arabic arabic-text">{session.arabicTitle}</span>
-        </div>
-        <div className="resume-details">
-          <span className="resume-reciter">{session.reciterName}</span>
-          <span className="dot-sep">•</span>
-          <span className="resume-time">
-            <Clock size={13} style={{ marginRight: 3, verticalAlign: 'middle' }} />
-            {formatTime(session.currentTime)} / {session.duration > 0 ? formatTime(session.duration) : '--:--'}
-          </span>
-          {progressPercent > 0 && (
-            <>
-              <span className="dot-sep">•</span>
-              <span className="resume-progress-pill">{progressPercent}% complete</span>
-            </>
-          )}
+        <div className="resume-slim-text">
+          <div className="resume-slim-title-row">
+            <span className="resume-slim-tag">
+              <Sparkles size={11} />
+              <span>Resume</span>
+            </span>
+            <span className="resume-slim-surah">
+              {session.trackTitle || `Surah ${session.surahNumber}`}
+            </span>
+            <span className="resume-slim-arabic arabic-text">{session.arabicTitle}</span>
+          </div>
+          <div className="resume-slim-meta">
+            <span>{session.reciterName}</span>
+            <span className="dot-sep">•</span>
+            <span>{formatTime(session.currentTime)} / {session.duration > 0 ? formatTime(session.duration) : '--:--'}</span>
+          </div>
         </div>
       </div>
 
-      <button className="resume-btn" onClick={(e) => { e.stopPropagation(); onResume(session); }}>
-        <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
-        <span>Resume Recitation</span>
-      </button>
+      <div className="resume-slim-right">
+        {progressPercent > 0 && (
+          <span className="resume-slim-pill">{progressPercent}%</span>
+        )}
+        <button 
+          className="resume-slim-btn" 
+          onClick={(e) => { e.stopPropagation(); onResume(session); }}
+        >
+          <span>Play</span>
+        </button>
+      </div>
 
-      {/* Subtle bottom progress line */}
       {progressPercent > 0 && (
         <div 
-          className="resume-progress-line"
-          style={{ width: `${progressPercent}%` }}
+          className="resume-slim-progress" 
+          style={{ width: `${progressPercent}%` }} 
         />
       )}
     </div>

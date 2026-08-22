@@ -337,115 +337,141 @@ body {
 }
 
 /* ==========================================================================
-   RESUME HERO BANNER
+   SLIM RESUME BANNER (Compact & Space-Efficient)
    ========================================================================== */
-.resume-banner {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.08) 0%, var(--bg-card) 100%);
+.resume-banner-slim {
+  background: var(--bg-card);
   border: 1px solid var(--border-active);
-  border-radius: 18px;
-  padding: 18px 22px;
+  border-radius: 14px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
   position: relative;
   overflow: hidden;
   box-shadow: var(--card-shadow);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.resume-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow-hover);
-}
-
-.resume-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 1;
-}
-
-.resume-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--accent-emerald);
-}
-
-.sparkle-icon {
-  animation: pulse-ring 2s infinite ease-in-out;
-}
-
-.resume-title {
-  display: flex;
-  align-items: baseline;
+  transition: all 0.2s ease;
   gap: 10px;
 }
 
-.resume-surah-english {
-  font-size: 1.2rem;
-  font-weight: 700;
+.resume-banner-slim:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-emerald);
+  transform: translateY(-1px);
+  box-shadow: var(--card-shadow-hover);
 }
 
-.resume-arabic {
-  font-size: 1.4rem;
+.resume-slim-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.resume-slim-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent-emerald);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px var(--accent-emerald-glow);
+  flex-shrink: 0;
+}
+
+.resume-slim-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.resume-slim-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resume-slim-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--accent-emerald);
+  background: rgba(5, 150, 105, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.resume-slim-surah {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.resume-slim-arabic {
+  font-size: 0.95rem;
   color: var(--accent-gold);
 }
 
-.resume-details {
+.resume-slim-meta {
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  font-size: 0.82rem;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.resume-btn {
-  z-index: 1;
+.resume-slim-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
+  flex-shrink: 0;
+}
+
+.resume-slim-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-emerald);
+  background: rgba(5, 150, 105, 0.1);
+  padding: 2px 7px;
+  border-radius: 9999px;
+}
+
+.resume-slim-btn {
+  padding: 5px 12px;
   background: var(--accent-emerald);
   color: #ffffff;
   font-weight: 700;
-  font-size: 0.88rem;
-  border-radius: 12px;
+  font-size: 0.78rem;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 14px var(--accent-emerald-glow);
   transition: all 0.2s ease;
-  white-space: nowrap;
 }
 
-.resume-btn:hover {
+.resume-slim-btn:hover {
   background: var(--accent-emerald-light);
-  transform: scale(1.02);
 }
 
-.resume-progress-line {
+.resume-slim-progress {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 3px;
+  height: 2.5px;
   background: linear-gradient(90deg, var(--accent-emerald), var(--accent-gold));
-  border-radius: 0 0 18px 18px;
-}
-
-.resume-progress-pill {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--accent-emerald);
-  background: rgba(5, 150, 105, 0.12);
-  padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: 0 0 14px 14px;
 }
 
 /* ==========================================================================
