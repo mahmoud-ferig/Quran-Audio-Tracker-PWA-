@@ -103,46 +103,73 @@ export const SettingsModal: React.FC<Props> = ({
         {/* Firebase Config Tab */}
         {activeTab === 'firebase' && (
           <form onSubmit={handleSaveFirebase}>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Connect your Firebase Project to sync your listening position instantly across your phone and laptop.
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <Check size={18} color="var(--accent-emerald)" />
+              <div>
+                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Cloud Firestore Connected
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  Project: {fbConfig.projectId || 'quran-audio-tracker-app'}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Your playback progress and favorites are securely synchronized with Cloud Firestore using isolated user IDs.
             </p>
 
-            <div className="form-group">
-              <label className="form-label">Firebase API Key</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="AIzaSy..."
-                value={fbConfig.apiKey}
-                onChange={(e) => setFbConfig({ ...fbConfig, apiKey: e.target.value })}
-              />
-            </div>
+            <details style={{ marginTop: '10px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+              <summary style={{ fontSize: '0.8rem', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '12px' }}>
+                Advanced: Custom Project Override
+              </summary>
 
-            <div className="form-group">
-              <label className="form-label">Project ID</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="my-quran-app"
-                value={fbConfig.projectId}
-                onChange={(e) => setFbConfig({ ...fbConfig, projectId: e.target.value })}
-              />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Firebase API Key</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="AIzaSy..."
+                  value={fbConfig.apiKey}
+                  onChange={(e) => setFbConfig({ ...fbConfig, apiKey: e.target.value })}
+                />
+              </div>
 
-            <div className="form-group">
-              <label className="form-label">App ID</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="1:123456789:web:abcdef"
-                value={fbConfig.appId}
-                onChange={(e) => setFbConfig({ ...fbConfig, appId: e.target.value })}
-              />
-            </div>
+              <div className="form-group">
+                <label className="form-label">Project ID</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="my-quran-app"
+                  value={fbConfig.projectId}
+                  onChange={(e) => setFbConfig({ ...fbConfig, projectId: e.target.value })}
+                />
+              </div>
 
-            <button type="submit" className="primary-btn">
-              Save Firebase Configuration
-            </button>
+              <div className="form-group">
+                <label className="form-label">App ID</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="1:123456789:web:abcdef"
+                  value={fbConfig.appId}
+                  onChange={(e) => setFbConfig({ ...fbConfig, appId: e.target.value })}
+                />
+              </div>
+
+              <button type="submit" className="primary-btn" style={{ marginTop: '10px' }}>
+                Save Custom Configuration
+              </button>
+            </details>
           </form>
         )}
 
