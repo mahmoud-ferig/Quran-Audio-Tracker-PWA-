@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Reciter } from '../types';
 import { RECITERS } from '../services/quranData';
 
@@ -11,34 +11,77 @@ export const ReciterSelector: React.FC<Props> = ({
   selectedReciterId,
   onSelectReciter
 }) => {
+  const [styleFilter, setStyleFilter] = useState<string>('all');
+
+  const filteredReciters = useMemo(() => {
+    if (styleFilter === 'all') return RECITERS;
+    if (styleFilter === 'murattal') return RECITERS.filter(r => r.style.toLowerCase().includes('murattal'));
+    if (styleFilter === 'mujawwad') return RECITERS.filter(r => r.style.toLowerCase().includes('mujawwad'));
+    if (styleFilter === 'haram') return RECITERS.filter(r => r.style.toLowerCase().includes('haram'));
+    return RECITERS;
+  }, [styleFilter]);
+
   return (
-    <section style={{ marginBottom: '24px' }}>
-      <div className="section-title">
-        <span>Select Reciter (القراء)</span>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-          {RECITERS.length} Reciters Available
-        </span>
+    <section className="reciters-section">
+      <div className="section-header">
+        <div className="section-title">
+          <span>Select Reciter</span>
+          <span className="section-arabic-title arabic-text">اختر القارئ</span>
+        </div>
+
+        {/* Style Filter Chips */}
+        <div className="reciter-style-chips">
+          <button 
+            className={`filter-chip ${styleFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setStyleFilter('all')}
+          >
+            All ({RECITERS.length})
+          </button>
+          <button 
+            className={`filter-chip ${styleFilter === 'murattal' ? 'active' : ''}`}
+            onClick={() => setStyleFilter('murattal')}
+          >
+            Murattal (مرتل)
+          </button>
+          <button 
+            className={`filter-chip ${styleFilter === 'mujawwad' ? 'active' : ''}`}
+            onClick={() => setStyleFilter('mujawwad')}
+          >
+            Mujawwad (مجود)
+          </button>
+          <button 
+            className={`filter-chip ${styleFilter === 'haram' ? 'active' : ''}`}
+            onClick={() => setStyleFilter('haram')}
+          >
+            Haram Makkah (الحرم)
+          </button>
+        </div>
       </div>
 
       <div className="reciter-scroll-container">
-        {RECITERS.map((reciter) => {
+        {filteredReciters.map((reciter) => {
           const isActive = reciter.id === selectedReciterId;
           return (
             <div
               key={reciter.id}
               className={`reciter-card ${isActive ? 'active' : ''}`}
               onClick={() => onSelectReciter(reciter)}
+              role="button"
+              tabIndex={0}
             >
-              <img
-                src={reciter.photoUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80'}
-                alt={reciter.name}
-                className="reciter-avatar"
-                loading="lazy"
-              />
+              <div className="reciter-avatar-wrap">
+                <img
+                  src={reciter.photoUrl}
+                  alt={reciter.name}
+                  className="reciter-avatar"
+                  loading="lazy"
+                />
+                {isActive && <span className="reciter-active-dot" />}
+              </div>
               <div className="reciter-name" title={reciter.name}>
                 {reciter.name}
               </div>
-              <div className="arabic-text" style={{ fontSize: '0.85rem', color: 'var(--accent-gold-light)', marginTop: '2px' }}>
+              <div className="reciter-arabic arabic-text">
                 {reciter.arabicName}
               </div>
               <div className="reciter-style">

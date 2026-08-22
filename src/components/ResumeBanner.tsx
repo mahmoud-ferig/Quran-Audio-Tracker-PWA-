@@ -22,36 +22,44 @@ export const ResumeBanner: React.FC<Props> = ({ session, onResume }) => {
     : 0;
 
   return (
-    <div className="resume-banner">
+    <div className="resume-banner" onClick={() => onResume(session)} role="button" tabIndex={0}>
       <div className="resume-info">
         <div className="resume-tag">
-          <Sparkles size={14} />
-          <span>Continue Where You Left Off</span>
+          <Sparkles size={14} className="sparkle-icon" />
+          <span>CONTINUE WHERE YOU LEFT OFF</span>
         </div>
         <div className="resume-title">
-          <span>{session.trackTitle || `Surah ${session.surahNumber}`}</span>
-          <span className="resume-arabic">{session.arabicTitle}</span>
+          <span className="resume-surah-english">{session.trackTitle || `Surah ${session.surahNumber}`}</span>
+          <span className="resume-arabic arabic-text">{session.arabicTitle}</span>
         </div>
         <div className="resume-details">
-          <span>{session.reciterName}</span>
-          <span>•</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Clock size={13} />
-            {formatTime(session.currentTime)} {session.duration > 0 ? `/ ${formatTime(session.duration)}` : 'stopped point'}
+          <span className="resume-reciter">{session.reciterName}</span>
+          <span className="dot-sep">•</span>
+          <span className="resume-time">
+            <Clock size={13} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+            {formatTime(session.currentTime)} / {session.duration > 0 ? formatTime(session.duration) : '--:--'}
           </span>
           {progressPercent > 0 && (
             <>
-              <span>•</span>
-              <span className="progress-pill">{progressPercent}% complete</span>
+              <span className="dot-sep">•</span>
+              <span className="resume-progress-pill">{progressPercent}% complete</span>
             </>
           )}
         </div>
       </div>
 
-      <button className="resume-btn" onClick={() => onResume(session)}>
-        <Play size={18} fill="currentColor" />
+      <button className="resume-btn" onClick={(e) => { e.stopPropagation(); onResume(session); }}>
+        <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
         <span>Resume Recitation</span>
       </button>
+
+      {/* Subtle bottom progress line */}
+      {progressPercent > 0 && (
+        <div 
+          className="resume-progress-line"
+          style={{ width: `${progressPercent}%` }}
+        />
+      )}
     </div>
   );
 };

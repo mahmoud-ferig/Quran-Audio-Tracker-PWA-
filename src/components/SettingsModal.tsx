@@ -9,7 +9,7 @@ import {
 } from '../firebase/config';
 import { setUserEmail, removeUserEmail, migrateUserData, getUserEmail } from '../services/storage';
 import { getSoundCloudClientId, setSoundCloudClientId } from '../services/soundcloud';
-import type { ThemeMode } from '../services/theme';
+import type { ThemeMode, AccentColor } from '../services/theme';
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +19,8 @@ interface Props {
   onConfigUpdated: () => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
+  accent: AccentColor;
+  onChangeAccent: (accent: AccentColor) => void;
 }
 
 export const SettingsModal: React.FC<Props> = ({
@@ -28,7 +30,9 @@ export const SettingsModal: React.FC<Props> = ({
   onUserIdChanged,
   onConfigUpdated,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  accent,
+  onChangeAccent
 }) => {
   const [activeTab, setActiveTab] = useState<'account' | 'firebase' | 'soundcloud'>('account');
   const [copied, setCopied] = useState(false);
@@ -231,40 +235,82 @@ export const SettingsModal: React.FC<Props> = ({
               background: 'var(--bg-surface-elevated)',
               border: '1px solid var(--border-subtle)',
               borderRadius: '10px',
-              padding: '10px 14px',
+              padding: '12px 14px',
               marginTop: '16px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              flexDirection: 'column',
+              gap: '10px'
             }}>
-              <div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  App Theme
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    App Theme
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {theme === 'light' ? 'Light Theme (Default)' : 'Dark Theme'}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  {theme === 'light' ? 'Light Theme (Default)' : 'Dark Theme'}
-                </div>
+
+                <button
+                  type="button"
+                  className="control-btn"
+                  onClick={onToggleTheme}
+                  style={{
+                    width: 'auto',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'}
+                </button>
               </div>
 
-              <button
-                type="button"
-                className="control-btn"
-                onClick={onToggleTheme}
-                style={{
-                  width: 'auto',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                {theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'}
-              </button>
+              {/* Accent Color Palette */}
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  Accent Color (لون التمييز)
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'emerald', label: 'Emerald Oasis', color: '#059669' },
+                    { id: 'gold', label: 'Royal Gold', color: '#d97706' },
+                    { id: 'indigo', label: 'Royal Indigo', color: '#6366f1' },
+                    { id: 'sapphire', label: 'Sapphire Blue', color: '#0284c7' }
+                  ].map((acc) => (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => onChangeAccent(acc.id as AccentColor)}
+                      className={`filter-chip ${accent === acc.id ? 'active' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '0.75rem',
+                        padding: '4px 10px'
+                      }}
+                    >
+                      <span 
+                        style={{ 
+                          width: '10px', 
+                          height: '10px', 
+                          borderRadius: '50%', 
+                          background: acc.color,
+                          display: 'inline-block' 
+                        }} 
+                      />
+                      {acc.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>

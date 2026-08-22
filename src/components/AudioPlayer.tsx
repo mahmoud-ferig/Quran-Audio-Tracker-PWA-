@@ -2,42 +2,32 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
-  RotateCcw, 
-  RotateCw, 
   SkipBack, 
   SkipForward, 
-  Repeat, 
-  Repeat1, 
-  Volume2, 
-  Volume1,
-  VolumeX,
-  Moon,
-  Loader2
+  Loader2,
+  ChevronUp
 } from 'lucide-react';
 import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
-import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting, setAutoplaySetting } from '../services/storage';
+import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting } from '../services/storage';
+import { FullScreenPlayer } from './FullScreenPlayer';
 
 interface Props {
   track: Track | null;
   userId: string;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onNextTrack: () => void;
   onPrevTrack: () => void;
   onProgressUpdated: (trackId: string, progress: ListeningProgress) => void;
 }
 
 const SPEED_OPTIONS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-const SLEEP_OPTIONS: { label: string; value: SleepTimerOption }[] = [
-  { label: 'Off', value: 0 },
-  { label: '15 min', value: 15 },
-  { label: '30 min', value: 30 },
-  { label: '45 min', value: 45 },
-  { label: '60 min', value: 60 },
-  { label: 'End of Surah', value: 'surah' }
-];
 
 export const AudioPlayer: React.FC<Props> = ({
   track,
   userId,
+  isFavorite = false,
+  onToggleFavorite = () => {},
   onNextTrack,
   onPrevTrack,
   onProgressUpdated
@@ -50,14 +40,16 @@ export const AudioPlayer: React.FC<Props> = ({
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1.0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('none');
-  const [autoplayNext, setAutoplayNext] = useState<boolean>(() => getAutoplaySetting());
+  const [autoplayNext] = useState<boolean>(() => getAutoplaySetting());
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Full Screen Sheet State
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
 
   // Sleep Timer state
   const [sleepTimer, setSleepTimer] = useState<SleepTimerOption>(0);
   const [sleepRemainingSeconds, setSleepRemainingSeconds] = useState<number | null>(null);
-  const [isSleepMenuOpen, setIsSleepMenuOpen] = useState(false);
 
   const lastSavedTimeRef = useRef<number>(0);
 
@@ -153,40 +145,60 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [isPlaying, persistProgress]);
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
+  const handleSeek = (time: number) => {
+    setCurrentTime(time);
     if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
+      audioRef.current.currentTime = time;
     }
   };
 
   const handleSeekCommit = () => {
-    persistProgress();
+    if (audioRef.current) {
+      persistProgress(audioRef.current.currentTime);
+    }
   };
 
   const handleSkip = useCallback((seconds: number) => {
     if (!audioRef.current) return;
-    const nextTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
-    audioRef.current.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  }, [duration]);
+    const newTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+    persistProgress(newTime);
+  }, [duration, persistProgress]);
+
+  const cycleSpeed = () => {
+    const currentIndex = SPEED_OPTIONS.indexOf(playbackSpeed);
+    const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
+    const newSpeed = SPEED_OPTIONS[nextIndex];
+    setPlaybackSpeed(newSpeed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newSpeed;
+    }
+  };
+
+  const toggleRepeat = () => {
+    if (repeatMode === 'none') setRepeatMode('one');
+    else if (repeatMode === 'one') setRepeatMode('all');
+    else setRepeatMode('none');
+  };
 
   const toggleMute = useCallback(() => {
-    if (audioRef.current) {
-      const nextMute = !isMuted;
-      audioRef.current.muted = nextMute;
-      setIsMuted(nextMute);
-    }
-  }, [isMuted]);
+    setIsMuted(prev => {
+      const next = !prev;
+      if (audioRef.current) {
+        audioRef.current.muted = next;
+      }
+      return next;
+    });
+  }, []);
 
   const handleTrackEnded = () => {
-    persistProgress(0, true);
+    persistProgress(duration, true);
 
-    // If Sleep Timer is set to end of surah
     if (sleepTimer === 'surah') {
       setIsPlaying(false);
       setSleepTimer(0);
+      setSleepRemainingSeconds(null);
       return;
     }
 
@@ -202,191 +214,95 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   };
 
-  const cycleSpeed = () => {
-    const currentIndex = SPEED_OPTIONS.indexOf(playbackSpeed);
-    const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
-    const newSpeed = SPEED_OPTIONS[nextIndex];
-    setPlaybackSpeed(newSpeed);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = newSpeed;
+  // Sleep Timer Countdown Effect
+  useEffect(() => {
+    if (typeof sleepTimer !== 'number' || sleepTimer === 0 || sleepRemainingSeconds === null) {
+      return;
     }
-  };
 
-  const toggleRepeat = () => {
-    if (repeatMode === 'none') setRepeatMode('all');
-    else if (repeatMode === 'all') setRepeatMode('one');
-    else setRepeatMode('none');
-  };
+    const interval = setInterval(() => {
+      setSleepRemainingSeconds((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+          setIsPlaying(false);
+          setSleepTimer(0);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  const handleAutoplayToggle = () => {
-    const nextVal = !autoplayNext;
-    setAutoplayNext(nextVal);
-    setAutoplaySetting(nextVal);
-  };
+    return () => clearInterval(interval);
+  }, [sleepTimer, sleepRemainingSeconds]);
 
-  // 1. Fetch saved progress on track change
+  // Load initial track progress
   useEffect(() => {
     if (!track) return;
+    let isCancelled = false;
 
-    let isMounted = true;
-
-    const loadSavedPoint = async () => {
-      try {
-        const saved = await getTrackProgress(userId, track.id);
-        if (saved && saved.currentTime > 0 && isMounted) {
-          if (audioRef.current) {
-            audioRef.current.currentTime = saved.currentTime;
-            setCurrentTime(saved.currentTime);
-            lastSavedTimeRef.current = saved.currentTime;
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching stop point:', err);
+    const initTrack = async () => {
+      const saved = await getTrackProgress(userId, track.id);
+      if (!isCancelled && saved && saved.currentTime > 0 && audioRef.current) {
+        audioRef.current.currentTime = saved.currentTime;
+        setCurrentTime(saved.currentTime);
       }
     };
 
-    loadSavedPoint();
-
+    initTrack();
     return () => {
-      isMounted = false;
+      isCancelled = true;
     };
   }, [track, userId]);
 
-  // 2. Setup MediaSession API
+  // MediaSession API Integration
   useEffect(() => {
-    if (!track || !('mediaSession' in navigator)) return;
+    if ('mediaSession' in navigator && track) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `${track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}${track.name} (${track.arabicName})`,
+        artist: track.reciterName,
+        album: 'The Holy Quran',
+        artwork: [
+          { src: track.artwork_url || '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: track.artwork_url || '/pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: `${track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}${track.name} (${track.arabicName})`,
-      artist: track.reciterName,
-      album: 'The Holy Quran',
-      artwork: track.artwork_url
-        ? [
-            { src: track.artwork_url, sizes: '96x96', type: 'image/jpeg' },
-            { src: track.artwork_url, sizes: '256x256', type: 'image/jpeg' },
-            { src: track.artwork_url, sizes: '512x512', type: 'image/jpeg' }
-          ]
-        : []
-    });
-
-    navigator.mediaSession.setActionHandler('play', () => {
-      audioRef.current?.play();
-      setIsPlaying(true);
-    });
-
-    navigator.mediaSession.setActionHandler('pause', () => {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-      persistProgress();
-    });
-
-    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-      const skip = details.seekOffset || 10;
-      if (audioRef.current) {
-        audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - skip);
-      }
-    });
-
-    navigator.mediaSession.setActionHandler('seekforward', (details) => {
-      const skip = details.seekOffset || 10;
-      if (audioRef.current) {
-        audioRef.current.currentTime = Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + skip);
-      }
-    });
-
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      onPrevTrack();
-    });
-
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-      onNextTrack();
-    });
-
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined && audioRef.current) {
-        audioRef.current.currentTime = details.seekTime;
-      }
-    });
-
-    return () => {
-      navigator.mediaSession.setActionHandler('play', null);
-      navigator.mediaSession.setActionHandler('pause', null);
-      navigator.mediaSession.setActionHandler('seekbackward', null);
-      navigator.mediaSession.setActionHandler('seekforward', null);
-      navigator.mediaSession.setActionHandler('previoustrack', null);
-      navigator.mediaSession.setActionHandler('nexttrack', null);
-      navigator.mediaSession.setActionHandler('seekto', null);
-    };
-  }, [track, persistProgress, onPrevTrack, onNextTrack]);
-
-  // 3. Sleep Timer interval countdown
-  useEffect(() => {
-    if (typeof sleepTimer === 'number' && sleepTimer > 0) {
-      const interval = setInterval(() => {
-        setSleepRemainingSeconds((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(interval);
-            if (audioRef.current) {
-              audioRef.current.pause();
-              setIsPlaying(false);
-            }
-            setSleepTimer(0);
-            return null;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
+      navigator.mediaSession.setActionHandler('play', () => handleTogglePlay());
+      navigator.mediaSession.setActionHandler('pause', () => handleTogglePlay());
+      navigator.mediaSession.setActionHandler('previoustrack', onPrevTrack);
+      navigator.mediaSession.setActionHandler('nexttrack', onNextTrack);
+      navigator.mediaSession.setActionHandler('seekbackward', () => handleSkip(-10));
+      navigator.mediaSession.setActionHandler('seekforward', () => handleSkip(10));
     }
-  }, [sleepTimer]);
+  }, [track, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip]);
 
-  // 4. Save on window unload / minimize
-  useEffect(() => {
-    const handleUnload = () => {
-      if (audioRef.current && audioRef.current.currentTime > 0) {
-        persistProgress(audioRef.current.currentTime);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    window.addEventListener('pagehide', handleUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      window.removeEventListener('pagehide', handleUnload);
-    };
-  }, [persistProgress]);
-
-  // 5. Global Keyboard Shortcuts
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')
-      ) {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
 
-      if (e.code === 'Space') {
-        e.preventDefault();
-        handleTogglePlay();
-      } else if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        handleSkip(10);
-      } else if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        handleSkip(-10);
-      } else if (e.code === 'KeyM') {
-        e.preventDefault();
-        toggleMute();
-      } else if (e.code === 'ArrowUp') {
-        e.preventDefault();
-        setVolume((v) => Math.min(1, Math.round((v + 0.1) * 10) / 10));
-      } else if (e.code === 'ArrowDown') {
-        e.preventDefault();
-        setVolume((v) => Math.max(0, Math.round((v - 0.1) * 10) / 10));
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          handleTogglePlay();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleSkip(10);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          handleSkip(-10);
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          toggleMute();
+          break;
       }
     };
 
@@ -394,7 +310,7 @@ export const AudioPlayer: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, handleSkip, toggleMute]);
 
-  // Volume synchronization
+  // Volume Sync
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
@@ -412,8 +328,10 @@ export const AudioPlayer: React.FC<Props> = ({
 </svg>
 `)}`;
 
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
-    <div className="player-bar">
+    <>
       <audio
         ref={audioRef}
         src={track.stream_url}
@@ -433,40 +351,43 @@ export const AudioPlayer: React.FC<Props> = ({
         onEnded={handleTrackEnded}
       />
 
-      <div className="player-inner">
-        {/* Left: Track Information */}
-        <div className="player-track-info">
-          <img
-            src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
-            alt={track.name}
-            className="player-artwork"
-          />
-          <div className="player-title-box">
-            <div className="player-track-title">
-              {track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}{track.name}
-            </div>
-            <div className="player-track-sub">
-              {track.reciterName}
+      {/* Floating Mini Player Bar */}
+      <div 
+        className="mini-player-bar" 
+        onClick={() => setIsFullScreenOpen(true)}
+        role="button"
+        tabIndex={0}
+        aria-label="Expand Now Playing"
+      >
+        {/* Top Progress Line Indicator */}
+        <div 
+          className="mini-player-progress-line" 
+          style={{ width: `${progressPercent}%` }} 
+        />
+
+        <div className="mini-player-inner">
+          {/* Left: Artwork & Info */}
+          <div className="mini-player-info">
+            <img
+              src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
+              alt={track.name}
+              className="mini-player-artwork"
+            />
+            <div className="mini-player-text">
+              <div className="mini-player-title">
+                {track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}{track.name}
+                <span className="mini-player-arabic arabic-text">{track.arabicName}</span>
+              </div>
+              <div className="mini-player-sub">
+                {track.reciterName} • {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Center: Controls & Scrubber */}
-        <div className="player-controls-center">
-          <div className="player-buttons">
-            {/* Repeat Button */}
+          {/* Right: Quick Action Controls */}
+          <div className="mini-player-actions" onClick={(e) => e.stopPropagation()}>
             <button
-              className={`control-btn ${repeatMode !== 'none' ? 'active' : ''}`}
-              onClick={toggleRepeat}
-              title={`Repeat: ${repeatMode === 'none' ? 'Off' : repeatMode === 'one' ? 'Repeat 1' : 'Repeat All'}`}
-              aria-label="Repeat mode"
-            >
-              {repeatMode === 'one' ? <Repeat1 size={17} /> : <Repeat size={17} />}
-            </button>
-
-            {/* Prev Track */}
-            <button
-              className="control-btn"
+              className="mini-action-btn"
               onClick={onPrevTrack}
               title="Previous Surah"
               aria-label="Previous Surah"
@@ -474,45 +395,23 @@ export const AudioPlayer: React.FC<Props> = ({
               <SkipBack size={18} />
             </button>
 
-            {/* Skip -10s */}
             <button
-              className="control-btn"
-              onClick={() => handleSkip(-10)}
-              title="Rewind 10 seconds (←)"
-              aria-label="Rewind 10 seconds"
-            >
-              <RotateCcw size={18} />
-            </button>
-
-            {/* Play / Pause Main Button with Buffering state */}
-            <button
-              className="play-pause-btn"
+              className="mini-play-btn"
               onClick={handleTogglePlay}
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              title={isPlaying ? 'Pause' : 'Play'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isBuffering ? (
-                <Loader2 size={20} className="animate-spin" />
+                <Loader2 size={18} className="animate-spin" />
               ) : isPlaying ? (
-                <Pause size={20} fill="currentColor" />
+                <Pause size={18} fill="currentColor" />
               ) : (
-                <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />
+                <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
               )}
             </button>
 
-            {/* Skip +10s */}
             <button
-              className="control-btn"
-              onClick={() => handleSkip(10)}
-              title="Forward 10 seconds (→)"
-              aria-label="Forward 10 seconds"
-            >
-              <RotateCw size={18} />
-            </button>
-
-            {/* Next Track */}
-            <button
-              className="control-btn"
+              className="mini-action-btn"
               onClick={onNextTrack}
               title="Next Surah"
               aria-label="Next Surah"
@@ -520,151 +419,55 @@ export const AudioPlayer: React.FC<Props> = ({
               <SkipForward size={18} />
             </button>
 
-            {/* Speed Badge */}
             <button
-              className="speed-badge"
-              onClick={cycleSpeed}
-              title="Change Playback Speed"
+              className="mini-action-btn expand-btn"
+              onClick={() => setIsFullScreenOpen(true)}
+              title="Expand Player"
+              aria-label="Expand Player"
             >
-              {playbackSpeed}x
+              <ChevronUp size={20} />
             </button>
-          </div>
-
-          {/* Scrubber Bar */}
-          <div className="scrubber-container">
-            <span className="time-label">{formatTime(currentTime)}</span>
-            <input
-              type="range"
-              className="scrubber-bar"
-              min={0}
-              max={duration || 100}
-              step={0.1}
-              value={currentTime}
-              onChange={handleSeek}
-              onMouseUp={handleSeekCommit}
-              onTouchEnd={handleSeekCommit}
-            />
-            <span className="time-label right">{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Right: Quick Options / Sleep / Volume */}
-        <div className="player-options-right" style={{ position: 'relative' }}>
-          {/* Autoplay Next Surah Toggle */}
-          <button
-            className={`control-btn ${autoplayNext ? 'active' : ''}`}
-            onClick={handleAutoplayToggle}
-            title={autoplayNext ? 'Autoplay Next Surah: ON' : 'Autoplay Next Surah: OFF'}
-            style={{ fontSize: '0.75rem', fontWeight: 600, padding: '4px 8px', width: 'auto' }}
-          >
-            Auto {autoplayNext ? '✓' : '✗'}
-          </button>
-
-          {/* Sleep Timer Button */}
-          <button
-            className={`control-btn ${sleepTimer !== 0 ? 'active' : ''}`}
-            onClick={() => setIsSleepMenuOpen(!isSleepMenuOpen)}
-            title={
-              sleepRemainingSeconds !== null
-                ? `Sleep timer: ${Math.ceil(sleepRemainingSeconds / 60)}m left`
-                : sleepTimer === 'surah'
-                ? 'Sleep at end of Surah'
-                : 'Set Sleep Timer'
-            }
-          >
-            <Moon size={17} />
-            {sleepRemainingSeconds !== null && (
-              <span style={{ fontSize: '0.68rem', marginLeft: 3 }}>
-                {Math.ceil(sleepRemainingSeconds / 60)}m
-              </span>
-            )}
-          </button>
-
-          {/* Sleep Menu Popover */}
-          {isSleepMenuOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '100%',
-                right: 0,
-                marginBottom: '10px',
-                background: 'var(--bg-surface-elevated)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '12px',
-                padding: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                zIndex: 100,
-                minWidth: '130px'
-              }}
-            >
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '4px 8px', fontWeight: 600 }}>
-                Sleep Timer
-              </div>
-              {SLEEP_OPTIONS.map((opt) => (
-                <button
-                  key={opt.label}
-                  className={`control-btn ${sleepTimer === opt.value ? 'active' : ''}`}
-                  style={{
-                    width: '100%',
-                    justifyContent: 'flex-start',
-                    padding: '6px 10px',
-                    fontSize: '0.8rem',
-                    borderRadius: '8px',
-                    textAlign: 'left'
-                  }}
-                  onClick={() => {
-                    setSleepTimer(opt.value);
-                    setSleepRemainingSeconds(typeof opt.value === 'number' && opt.value > 0 ? opt.value * 60 : null);
-                    setIsSleepMenuOpen(false);
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Volume Control */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              className="control-btn"
-              onClick={toggleMute}
-              title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
-            >
-              {isMuted || volume === 0 ? (
-                <VolumeX size={18} />
-              ) : volume < 0.5 ? (
-                <Volume1 size={18} />
-              ) : (
-                <Volume2 size={18} />
-              )}
-            </button>
-
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => {
-                const newVol = parseFloat(e.target.value);
-                setVolume(newVol);
-                if (isMuted && newVol > 0) setIsMuted(false);
-              }}
-              style={{
-                width: '60px',
-                height: '4px',
-                accentColor: 'var(--accent-emerald)',
-                cursor: 'pointer'
-              }}
-              title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
-            />
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Expandable Full-Screen Sheet */}
+      <FullScreenPlayer
+        isOpen={isFullScreenOpen}
+        onClose={() => setIsFullScreenOpen(false)}
+        track={track}
+        isPlaying={isPlaying}
+        isBuffering={isBuffering}
+        currentTime={currentTime}
+        duration={duration}
+        playbackSpeed={playbackSpeed}
+        repeatMode={repeatMode}
+        sleepTimer={sleepTimer}
+        sleepRemainingSeconds={sleepRemainingSeconds}
+        volume={volume}
+        isMuted={isMuted}
+        isFavorite={isFavorite}
+        onTogglePlay={handleTogglePlay}
+        onSeek={(t) => {
+          handleSeek(t);
+          handleSeekCommit();
+        }}
+        onSkip={handleSkip}
+        onNextTrack={onNextTrack}
+        onPrevTrack={onPrevTrack}
+        onCycleSpeed={cycleSpeed}
+        onToggleRepeat={toggleRepeat}
+        onSetSleepTimer={(opt) => {
+          setSleepTimer(opt);
+          setSleepRemainingSeconds(typeof opt === 'number' && opt > 0 ? opt * 60 : null);
+        }}
+        onToggleMute={toggleMute}
+        onVolumeChange={(v) => {
+          setVolume(v);
+          if (isMuted && v > 0) setIsMuted(false);
+        }}
+        onToggleFavorite={onToggleFavorite}
+      />
+    </>
   );
 };

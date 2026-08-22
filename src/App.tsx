@@ -11,8 +11,8 @@ import {
   saveUserSettings
 } from './services/storage';
 import { initializeFirebase } from './firebase/config';
-import { getStoredTheme, applyTheme } from './services/theme';
-import type { ThemeMode } from './services/theme';
+import { getStoredTheme, getStoredAccent, applyTheme } from './services/theme';
+import type { ThemeMode, AccentColor } from './services/theme';
 import { Header } from './components/Header';
 import { ResumeBanner } from './components/ResumeBanner';
 import { ReciterSelector } from './components/ReciterSelector';
@@ -23,6 +23,7 @@ import { CustomStreamModal } from './components/CustomStreamModal';
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
+  const [accent, setAccent] = useState<AccentColor>(() => getStoredAccent());
   const [userId, setUserId] = useState<string>(getOrCreateUserId());
   const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(() => initializeFirebase().isConfigured);
   const [selectedReciter, setSelectedReciter] = useState<Reciter>(RECITERS[0]);
@@ -33,15 +34,20 @@ export const App: React.FC = () => {
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
   const [favorites, setFavorites] = useState<number[]>([]);
 
-  // Apply theme on mount and when changed
+  // Apply theme & accent on mount and when changed
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+    applyTheme(theme, accent);
+  }, [theme, accent]);
 
   const handleToggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
-    applyTheme(next);
+    applyTheme(next, accent);
+  };
+
+  const handleChangeAccent = (newAccent: AccentColor) => {
+    setAccent(newAccent);
+    applyTheme(theme, newAccent);
   };
 
   // Modals
@@ -232,10 +238,16 @@ export const App: React.FC = () => {
         />
       </main>
 
-      {/* Sticky Bottom Audio Player */}
+      {/* Sticky Bottom Audio Player with Full Screen Sheet */}
       <AudioPlayer
         track={activeTrack}
         userId={userId}
+        isFavorite={activeTrack ? favorites.includes(activeTrack.surahNumber) : false}
+        onToggleFavorite={() => {
+          if (activeTrack && activeTrack.surahNumber > 0) {
+            handleToggleFavorite(activeTrack.surahNumber);
+          }
+        }}
         onNextTrack={handleNextTrack}
         onPrevTrack={handlePrevTrack}
         onProgressUpdated={handleProgressUpdated}
@@ -250,6 +262,8 @@ export const App: React.FC = () => {
         onConfigUpdated={handleFirebaseConfigUpdated}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        accent={accent}
+        onChangeAccent={handleChangeAccent}
       />
 
       {/* Custom Stream / SoundCloud Modal */}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Volume2, Star } from 'lucide-react';
+import { Search, Star, X, Sparkles } from 'lucide-react';
 import type { Track, ListeningProgress } from '../types';
 
 interface Props {
@@ -26,11 +26,13 @@ export const TrackList: React.FC<Props> = ({
 
   const filteredTracks = useMemo(() => {
     return tracks.filter((track) => {
+      const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
-        track.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.englishName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.arabicName.includes(searchQuery) ||
-        track.surahNumber.toString() === searchQuery.trim();
+        !q ||
+        track.name.toLowerCase().includes(q) ||
+        track.englishName.toLowerCase().includes(q) ||
+        track.arabicName.includes(q) ||
+        track.surahNumber.toString() === q;
 
       if (!matchesSearch) return false;
 
@@ -51,15 +53,18 @@ export const TrackList: React.FC<Props> = ({
   }, [progressMap]);
 
   return (
-    <section>
-      <div className="section-title">
-        <span>Surahs & Recitations (السور)</span>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+    <section className="surahs-section">
+      <div className="section-header">
+        <div className="section-title">
+          <span>Surahs & Recitations</span>
+          <span className="section-arabic-title arabic-text">السور والتلاوات</span>
+        </div>
+        <span className="surah-count-badge">
           {filteredTracks.length} of {tracks.length}
         </span>
       </div>
 
-      {/* Search Input */}
+      {/* Search Input Bar */}
       <div className="search-container">
         <Search className="search-icon" size={18} />
         <input
@@ -69,94 +74,54 @@ export const TrackList: React.FC<Props> = ({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        {searchQuery && (
+          <button 
+            className="search-clear-btn" 
+            onClick={() => setSearchQuery('')}
+            title="Clear search"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '4px' }}>
+      <div className="filter-chips-row">
         <button
-          className={`control-btn ${filterType === 'all' ? 'active' : ''}`}
-          style={{
-            padding: '6px 14px',
-            width: 'auto',
-            borderRadius: '9999px',
-            background: filterType === 'all' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            border: filterType === 'all' ? '1px solid var(--accent-emerald)' : '1px solid var(--border-subtle)',
-            color: filterType === 'all' ? 'var(--accent-emerald-light)' : 'var(--text-secondary)',
-            fontSize: '0.82rem',
-            fontWeight: 600
-          }}
+          className={`filter-chip ${filterType === 'all' ? 'active' : ''}`}
           onClick={() => setFilterType('all')}
         >
           All ({tracks.length})
         </button>
 
         <button
-          className={`control-btn ${filterType === 'favorites' ? 'active' : ''}`}
-          style={{
-            padding: '6px 14px',
-            width: 'auto',
-            borderRadius: '9999px',
-            background: filterType === 'favorites' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            border: filterType === 'favorites' ? '1px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
-            color: filterType === 'favorites' ? 'var(--accent-gold-light)' : 'var(--text-secondary)',
-            fontSize: '0.82rem',
-            fontWeight: 600
-          }}
+          className={`filter-chip ${filterType === 'favorites' ? 'active' : ''}`}
           onClick={() => setFilterType('favorites')}
         >
-          <Star size={13} fill={filterType === 'favorites' ? 'currentColor' : 'none'} style={{ marginRight: 5, verticalAlign: 'middle' }} />
+          <Star size={13} fill={filterType === 'favorites' ? 'currentColor' : 'none'} style={{ marginRight: 4 }} />
           Favorites ({favorites.length})
         </button>
 
         <button
-          className={`control-btn ${filterType === 'Meccan' ? 'active' : ''}`}
-          style={{
-            padding: '6px 14px',
-            width: 'auto',
-            borderRadius: '9999px',
-            background: filterType === 'Meccan' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            border: filterType === 'Meccan' ? '1px solid var(--accent-emerald)' : '1px solid var(--border-subtle)',
-            color: filterType === 'Meccan' ? 'var(--accent-emerald-light)' : 'var(--text-secondary)',
-            fontSize: '0.82rem',
-            fontWeight: 600
-          }}
+          className={`filter-chip ${filterType === 'Meccan' ? 'active' : ''}`}
           onClick={() => setFilterType('Meccan')}
         >
-          Meccan (مكية)
+          🕋 Meccan (مكية)
         </button>
 
         <button
-          className={`control-btn ${filterType === 'Medinan' ? 'active' : ''}`}
-          style={{
-            padding: '6px 14px',
-            width: 'auto',
-            borderRadius: '9999px',
-            background: filterType === 'Medinan' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            border: filterType === 'Medinan' ? '1px solid var(--accent-emerald)' : '1px solid var(--border-subtle)',
-            color: filterType === 'Medinan' ? 'var(--accent-emerald-light)' : 'var(--text-secondary)',
-            fontSize: '0.82rem',
-            fontWeight: 600
-          }}
+          className={`filter-chip ${filterType === 'Medinan' ? 'active' : ''}`}
           onClick={() => setFilterType('Medinan')}
         >
-          Medinan (مدنية)
+          🕌 Medinan (مدنية)
         </button>
 
         {inProgressCount > 0 && (
           <button
-            className={`control-btn ${filterType === 'progress' ? 'active' : ''}`}
-            style={{
-              padding: '6px 14px',
-              width: 'auto',
-              borderRadius: '9999px',
-              background: filterType === 'progress' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-              border: filterType === 'progress' ? '1px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
-              color: filterType === 'progress' ? 'var(--accent-gold-light)' : 'var(--text-secondary)',
-              fontSize: '0.82rem',
-              fontWeight: 600
-            }}
+            className={`filter-chip ${filterType === 'progress' ? 'active' : ''}`}
             onClick={() => setFilterType('progress')}
           >
+            <Sparkles size={13} style={{ marginRight: 4 }} />
             In Progress ({inProgressCount})
           </button>
         )}
@@ -176,13 +141,20 @@ export const TrackList: React.FC<Props> = ({
               key={track.id}
               className={`track-card ${isActive ? 'active' : ''}`}
               onClick={() => onSelectTrack(track)}
+              role="button"
+              tabIndex={0}
             >
               <div className="track-left">
-                <div className="surah-badge">
+                {/* Octagonal / Rounded Calligraphic Badge */}
+                <div className={`surah-badge ${isActive ? 'active-badge' : ''}`}>
                   {isActive && isPlaying ? (
-                    <Volume2 size={18} className="animate-pulse-subtle" />
+                    <div className="badge-sound-wave">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
                   ) : (
-                    track.surahNumber > 0 ? track.surahNumber.toString().padStart(3, '0') : '♪'
+                    track.surahNumber > 0 ? track.surahNumber.toString().padStart(3, '0') : '★'
                   )}
                 </div>
 
@@ -194,35 +166,23 @@ export const TrackList: React.FC<Props> = ({
                     <span>{track.englishName}</span>
                     {track.versesCount > 0 && (
                       <>
-                        <span>•</span>
+                        <span className="dot-sep">•</span>
                         <span>{track.versesCount} verses</span>
                       </>
                     )}
-                    <span>•</span>
-                    <span style={{ 
-                      fontSize: '0.7rem', 
-                      padding: '1px 6px', 
-                      borderRadius: '4px', 
-                      background: 'rgba(255,255,255,0.05)' 
-                    }}>
-                      {track.revelationType}
+                    <span className="dot-sep">•</span>
+                    <span className="revelation-tag">
+                      {track.revelationType === 'Meccan' ? '🕋 Meccan' : '🕌 Medinan'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="track-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="track-right">
                 {track.surahNumber > 0 && (
                   <button
                     type="button"
-                    className="icon-btn"
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      color: isFav ? 'var(--accent-gold)' : 'var(--text-muted)',
-                      border: 'none',
-                      background: isFav ? 'rgba(245, 158, 11, 0.12)' : 'transparent'
-                    }}
+                    className={`track-fav-btn ${isFav ? 'active-fav' : ''}`}
                     title={isFav ? 'Remove from favorites' : 'Add to favorites'}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -233,12 +193,12 @@ export const TrackList: React.FC<Props> = ({
                   </button>
                 )}
 
-                <div style={{ textAlign: 'right' }}>
-                  <div className="track-arabic">
+                <div className="track-arabic-box">
+                  <div className="track-arabic arabic-text">
                     {track.arabicName}
                   </div>
                   {isComplete ? (
-                    <span className="progress-pill" style={{ color: 'var(--accent-emerald-light)' }}>
+                    <span className="progress-pill complete">
                       Completed ✓
                     </span>
                   ) : hasProgress ? (
@@ -262,9 +222,18 @@ export const TrackList: React.FC<Props> = ({
       </div>
 
       {filteredTracks.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-          <p style={{ fontSize: '1.1rem', marginBottom: '8px' }}>No Surahs found</p>
-          <p style={{ fontSize: '0.85rem' }}>Try refining your search query or clear the filter.</p>
+        <div className="empty-state-box">
+          <p className="empty-state-title">No Surahs found</p>
+          <p className="empty-state-sub">Try searching by a different name or number, or clear your active filter.</p>
+          <button 
+            className="empty-state-reset-btn"
+            onClick={() => {
+              setSearchQuery('');
+              setFilterType('all');
+            }}
+          >
+            Show All 114 Surahs
+          </button>
         </div>
       )}
     </section>
