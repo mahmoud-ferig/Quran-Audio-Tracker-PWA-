@@ -23,7 +23,7 @@ export const RECITERS: Reciter[] = [
     arabicName: 'محمد صديق المنشاوي (مجود)',
     style: 'Mujawwad',
     photoUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    serverUrl: 'https://server10.mp3quran.net/minsh/Almusshaf-Al-Mo-jawwad/'
+    serverUrl: 'https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/'
   },
   {
     id: 'husary',
@@ -71,7 +71,7 @@ export const RECITERS: Reciter[] = [
     arabicName: 'ياسر الدوسري',
     style: 'Murattal',
     photoUrl: 'https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?auto=format&fit=crop&w=400&q=80',
-    serverUrl: 'https://server11.mp3quran.net/dosry/'
+    serverUrl: 'https://server11.mp3quran.net/yasser/'
   },
   {
     id: 'noreen',
@@ -79,7 +79,7 @@ export const RECITERS: Reciter[] = [
     arabicName: 'نورين محمد صديق',
     style: 'Murattal (Sudanese Al-Duri)',
     photoUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
-    serverUrl: 'https://server16.mp3quran.net/nuri/'
+    serverUrl: 'https://server16.mp3quran.net/nourin_siddig/Rewayat-Aldori-A-n-Abi-Amr/'
   },
   {
     id: 'banna',
