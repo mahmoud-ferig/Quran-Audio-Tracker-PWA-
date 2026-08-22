@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Copy, Check, Cloud, Music, Trash2, ExternalLink, Mail, UserCheck, LogOut } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
 import { 
-  getSavedFirebaseConfig, 
+  getCustomFirebaseConfigOnly, 
   saveFirebaseConfig, 
   clearFirebaseConfig, 
   hasCustomFirebaseConfig 
@@ -31,7 +31,7 @@ export const SettingsModal: React.FC<Props> = ({
   const [scClientId, setScClientId] = useState(() => getSoundCloudClientId());
   const [isMigrating, setIsMigrating] = useState(false);
 
-  const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getSavedFirebaseConfig());
+  const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getCustomFirebaseConfigOnly());
   const [isCustomConfig, setIsCustomConfig] = useState(() => hasCustomFirebaseConfig());
 
   if (!isOpen) return null;
@@ -54,7 +54,6 @@ export const SettingsModal: React.FC<Props> = ({
 
     try {
       setIsMigrating(true);
-      // Migrate local data to email account
       await migrateUserData(userId, cleanEmail);
       const newId = setUserEmail(cleanEmail);
       onUserIdChanged(newId);
@@ -79,15 +78,19 @@ export const SettingsModal: React.FC<Props> = ({
 
   const handleSaveFirebase = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fbConfig.apiKey.trim() || !fbConfig.projectId.trim()) {
+      alert('Please enter a valid Firebase API Key and Project ID.');
+      return;
+    }
     saveFirebaseConfig(fbConfig);
     setIsCustomConfig(true);
     onConfigUpdated();
-    alert('Custom Firebase settings saved! Syncing initialized with your database.');
+    alert('Custom Firebase backend connected! Syncing is now routed to your private database.');
     onClose();
   };
 
   const handleClearFirebase = () => {
-    if (confirm('Disconnect your custom Firebase backend and revert to local mode?')) {
+    if (confirm('Disconnect your custom database and revert to the default cloud backend?')) {
       clearFirebaseConfig();
       setFbConfig({
         apiKey: '',
@@ -99,7 +102,7 @@ export const SettingsModal: React.FC<Props> = ({
       });
       setIsCustomConfig(false);
       onConfigUpdated();
-      alert('Firebase backend disconnected. App is now running in local offline mode.');
+      alert('Reverted to default cloud backend.');
     }
   };
 
@@ -246,8 +249,8 @@ export const SettingsModal: React.FC<Props> = ({
         {activeTab === 'firebase' && (
           <form onSubmit={handleSaveFirebase}>
             <div style={{
-              background: fbConfig.projectId ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${fbConfig.projectId ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-subtle)'}`,
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
               borderRadius: '10px',
               padding: '12px 14px',
               marginBottom: '16px',
@@ -257,13 +260,13 @@ export const SettingsModal: React.FC<Props> = ({
               gap: '10px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {fbConfig.projectId ? <Check size={18} color="var(--accent-emerald)" /> : <Cloud size={18} color="var(--text-muted)" />}
+                <Check size={18} color="var(--accent-emerald)" />
                 <div>
                   <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {fbConfig.projectId ? (isCustomConfig ? 'Custom Firebase Backend Active' : 'Cloud Firestore Active') : 'Local Offline Mode (Default)'}
+                    {isCustomConfig ? 'Custom Database Connected' : 'Cloud Firestore Active'}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                    {fbConfig.projectId ? `Project: ${fbConfig.projectId}` : 'All progress saved locally on device.'}
+                    {isCustomConfig ? `Custom Project: ${fbConfig.projectId}` : 'Default Cloud Sync is active under the hood for all users.'}
                   </div>
                 </div>
               </div>
@@ -273,7 +276,7 @@ export const SettingsModal: React.FC<Props> = ({
                   type="button"
                   onClick={handleClearFirebase}
                   className="icon-btn"
-                  title="Disconnect Custom Firebase"
+                  title="Disconnect Custom Database"
                   style={{ color: '#ef4444' }}
                 >
                   <Trash2 size={16} />
@@ -282,11 +285,11 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Want to sync your listening bookmarks with your own private Firebase database? Enter your personal Firebase Web App configuration below:
+              Want to route your sync to your own private Firebase project instead of the default cloud? Enter your personal credentials:
             </p>
 
             <div className="form-group">
-              <label className="form-label">Firebase API Key</label>
+              <label className="form-label">Custom Firebase API Key</label>
               <input
                 type="password"
                 className="form-input"
@@ -297,18 +300,18 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">Project ID</label>
+              <label className="form-label">Custom Project ID</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. my-quran-app"
+                placeholder="e.g. my-private-quran-db"
                 value={fbConfig.projectId}
                 onChange={(e) => setFbConfig({ ...fbConfig, projectId: e.target.value })}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">App ID</label>
+              <label className="form-label">Custom App ID</label>
               <input
                 type="text"
                 className="form-input"
@@ -320,7 +323,7 @@ export const SettingsModal: React.FC<Props> = ({
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
               <button type="submit" className="primary-btn" style={{ flex: 1 }}>
-                Save & Connect Backend
+                Connect Custom Database
               </button>
 
               {isCustomConfig && (
@@ -336,7 +339,7 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <div style={{ marginTop: '12px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>How to create your own free Firebase backend?</span>
+              <span>Want your own free private database?</span>
               <a
                 href="https://console.firebase.google.com"
                 target="_blank"

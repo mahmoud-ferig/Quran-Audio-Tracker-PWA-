@@ -18,7 +18,24 @@ import type { FirebaseConfigState } from '../types';
 const STORAGE_KEY_FIREBASE_CONFIG = 'quran_tracker_firebase_config';
 
 export function getSavedFirebaseConfig(): FirebaseConfigState {
-  const envConfig: FirebaseConfigState = {
+  try {
+    const custom = localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG);
+    if (custom) {
+      const parsed = JSON.parse(custom);
+      return {
+        apiKey: parsed.apiKey || '',
+        authDomain: parsed.authDomain || (parsed.projectId ? `${parsed.projectId}.firebaseapp.com` : ''),
+        projectId: parsed.projectId || '',
+        storageBucket: parsed.storageBucket || (parsed.projectId ? `${parsed.projectId}.firebasestorage.app` : ''),
+        messagingSenderId: parsed.messagingSenderId || '',
+        appId: parsed.appId || ''
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to parse saved Firebase config from localStorage:', e);
+  }
+
+  return {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
@@ -26,25 +43,6 @@ export function getSavedFirebaseConfig(): FirebaseConfigState {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
     appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
   };
-
-  try {
-    const custom = localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG);
-    if (custom) {
-      const parsed = JSON.parse(custom);
-      return {
-        apiKey: parsed.apiKey || envConfig.apiKey,
-        authDomain: parsed.authDomain || envConfig.authDomain,
-        projectId: parsed.projectId || envConfig.projectId,
-        storageBucket: parsed.storageBucket || envConfig.storageBucket,
-        messagingSenderId: parsed.messagingSenderId || envConfig.messagingSenderId,
-        appId: parsed.appId || envConfig.appId
-      };
-    }
-  } catch (e) {
-    console.warn('Failed to parse saved Firebase config from localStorage:', e);
-  }
-
-  return envConfig;
 }
 
 export function saveFirebaseConfig(config: FirebaseConfigState) {
@@ -52,6 +50,34 @@ export function saveFirebaseConfig(config: FirebaseConfigState) {
   app = null;
   db = null;
   storage = null;
+}
+
+export function getCustomFirebaseConfigOnly(): FirebaseConfigState {
+  try {
+    const custom = localStorage.getItem(STORAGE_KEY_FIREBASE_CONFIG);
+    if (custom) {
+      const parsed = JSON.parse(custom);
+      return {
+        apiKey: parsed.apiKey || '',
+        authDomain: parsed.authDomain || (parsed.projectId ? `${parsed.projectId}.firebaseapp.com` : ''),
+        projectId: parsed.projectId || '',
+        storageBucket: parsed.storageBucket || (parsed.projectId ? `${parsed.projectId}.firebasestorage.app` : ''),
+        messagingSenderId: parsed.messagingSenderId || '',
+        appId: parsed.appId || ''
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to parse saved Firebase config from localStorage:', e);
+  }
+
+  return {
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: ''
+  };
 }
 
 export function hasCustomFirebaseConfig(): boolean {
