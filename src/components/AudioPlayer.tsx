@@ -149,12 +149,12 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [isPlaying, persistProgress, onPlayStateChange]);
 
-  const handleSeek = (time: number) => {
+  const handleSeek = useCallback((time: number) => {
     setCurrentTime(time);
     if (audioRef.current) {
       audioRef.current.currentTime = time;
     }
-  };
+  }, []);
 
   const handleSeekCommit = useCallback(() => {
     if (audioRef.current) {
@@ -271,6 +271,18 @@ export const AudioPlayer: React.FC<Props> = ({
     };
   }, [track, userId]);
 
+  const onNextTrackRef = useRef(onNextTrack);
+  const onPrevTrackRef = useRef(onPrevTrack);
+  const onPlayStateChangeRef = useRef(onPlayStateChange);
+  const persistProgressRef = useRef(persistProgress);
+
+  useEffect(() => {
+    onNextTrackRef.current = onNextTrack;
+    onPrevTrackRef.current = onPrevTrack;
+    onPlayStateChangeRef.current = onPlayStateChange;
+    persistProgressRef.current = persistProgress;
+  });
+
   // MediaSession API Integration for Lock Screen and Notification Menu
   useEffect(() => {
     if ('mediaSession' in navigator && track) {
@@ -288,12 +300,45 @@ export const AudioPlayer: React.FC<Props> = ({
 
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
-      navigator.mediaSession.setActionHandler('play', () => handleTogglePlay());
-      navigator.mediaSession.setActionHandler('pause', () => handleTogglePlay());
-      navigator.mediaSession.setActionHandler('previoustrack', onPrevTrack);
-      navigator.mediaSession.setActionHandler('nexttrack', onNextTrack);
-      navigator.mediaSession.setActionHandler('seekbackward', () => handleSkip(-10));
-      navigator.mediaSession.setActionHandler('seekforward', () => handleSkip(10));
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (audioRef.current) {
+          audioRef.current.play().then(() => {
+            onPlayStateChangeRef.current(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          }).catch(e => console.error('MediaSession play error:', e));
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        onPlayStateChangeRef.current(false);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'paused';
+        }
+        persistProgressRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        onPrevTrackRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        onNextTrackRef.current();
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const skip = details.seekOffset || 10;
+        handleSkip(-skip);
+      });
+
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const skip = details.seekOffset || 10;
+        handleSkip(skip);
+      });
 
       try {
         navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -309,13 +354,16 @@ export const AudioPlayer: React.FC<Props> = ({
       try {
         navigator.mediaSession.setActionHandler('stop', () => {
           if (audioRef.current) audioRef.current.pause();
-          onPlayStateChange(false);
+          onPlayStateChangeRef.current(false);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+          }
         });
       } catch (e) {
         console.warn('MediaSession stop handler error:', e);
       }
     }
-  }, [track, isPlaying, handleTogglePlay, onNextTrack, onPrevTrack, handleSkip, handleSeekCommit, onPlayStateChange]);
+  }, [track, isPlaying, handleSkip, handleSeek, handleSeekCommit]);
 
   // Sync position state with system lock screen scrubber
   useEffect(() => {
@@ -397,10 +445,21 @@ export const AudioPlayer: React.FC<Props> = ({
         onPlaying={() => {
           setIsBuffering(false);
           onPlayStateChange(true);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
         }}
-        onCanPlay={() => setIsBuffering(false)}
+        onCanPlay={() => {
+          setIsBuffering(false);
+          if (isPlaying && audioRef.current && audioRef.current.paused) {
+            audioRef.current.play().catch(() => {});
+          }
+        }}
         onPause={() => {
           onPlayStateChange(false);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+          }
           persistProgress();
         }}
         onEnded={handleTrackEnded}

@@ -154,7 +154,7 @@ export const App: React.FC = () => {
   };
 
   // 5. Handle Next / Prev Track
-  const handleNextTrack = () => {
+  const handleNextTrack = useCallback(() => {
     if (!activeTrack) return;
     const currentIndex = tracks.findIndex(t => t.id === activeTrack.id);
     if (currentIndex >= 0 && currentIndex < tracks.length - 1) {
@@ -162,9 +162,9 @@ export const App: React.FC = () => {
     } else if (tracks.length > 0) {
       handleSelectTrack(tracks[0]);
     }
-  };
+  }, [activeTrack, tracks]);
 
-  const handlePrevTrack = () => {
+  const handlePrevTrack = useCallback(() => {
     if (!activeTrack) return;
     const currentIndex = tracks.findIndex(t => t.id === activeTrack.id);
     if (currentIndex > 0) {
@@ -172,7 +172,7 @@ export const App: React.FC = () => {
     } else if (tracks.length > 0) {
       handleSelectTrack(tracks[tracks.length - 1]);
     }
-  };
+  }, [activeTrack, tracks]);
 
   // 6. Progress Update Callback
   const handleProgressUpdated = useCallback((trackId: string, progress: ListeningProgress) => {
