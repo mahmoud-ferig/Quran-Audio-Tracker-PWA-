@@ -77,13 +77,11 @@ export const AudioPlayer: React.FC<Props> = ({
   // Efficient Save Progress Function
   const persistProgress = useCallback(
     async (overrideTime?: number, isFinished = false) => {
-      if (!track || !audioRef.current) return;
+      if (!track) return;
 
       const audio = audioRef.current;
-      const current = overrideTime !== undefined ? overrideTime : audio.currentTime;
-      const dur = audio.duration || duration || track.duration || 0;
-
-      if (dur === 0 && current === 0) return;
+      const current = overrideTime !== undefined ? overrideTime : (audio?.currentTime || 0);
+      const dur = audio?.duration || duration || track.duration || 0;
 
       const percentage = isFinished ? 100 : dur > 0 ? Math.min(100, Math.round((current / dur) * 100)) : 0;
 
@@ -122,8 +120,8 @@ export const AudioPlayer: React.FC<Props> = ({
     const now = audioRef.current.currentTime;
     setCurrentTime(now);
 
-    // Throttled background save: every 15s of playback delta
-    if (Math.abs(now - lastSavedTimeRef.current) >= 15) {
+    // Save every 5s of active playback delta
+    if (Math.abs(now - lastSavedTimeRef.current) >= 5) {
       persistProgress(now);
     }
   };
@@ -136,7 +134,10 @@ export const AudioPlayer: React.FC<Props> = ({
     }
     audioRef.current
       .play()
-      .then(() => setIsPlaying(true))
+      .then(() => {
+        setIsPlaying(true);
+        persistProgress(audioRef.current?.currentTime || 0);
+      })
       .catch(() => setIsPlaying(false));
   };
 
