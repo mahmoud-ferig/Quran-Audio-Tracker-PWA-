@@ -4,7 +4,9 @@ import { RECITERS, getTracksForReciter, generateTrackForSurah, SURAH_METADATA } 
 import { 
   getOrCreateUserId, 
   getAllProgress, 
-  getLastSession 
+  getLastSession,
+  getFavorites,
+  toggleFavorite
 } from './services/storage';
 import { initializeFirebase } from './firebase/config';
 import { Header } from './components/Header';
@@ -17,32 +19,32 @@ import { CustomStreamModal } from './components/CustomStreamModal';
 
 export const App: React.FC = () => {
   const [userId, setUserId] = useState<string>(getOrCreateUserId());
-  const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(false);
+  const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(() => initializeFirebase().isConfigured);
   const [selectedReciter, setSelectedReciter] = useState<Reciter>(RECITERS[0]);
   const [tracks, setTracks] = useState<Track[]>(() => getTracksForReciter(RECITERS[0]));
   const [activeTrack, setActiveTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [progressMap, setProgressMap] = useState<Record<string, ListeningProgress>>({});
   const [lastSession, setLastSession] = useState<LastSession | null>(null);
+  const [favorites, setFavorites] = useState<number[]>([]);
 
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCustomStreamOpen, setIsCustomStreamOpen] = useState(false);
 
-  // 1. Initial Load & Firebase Check
+  // 1. Initial Load
   useEffect(() => {
-    const { isConfigured } = initializeFirebase();
-    setIsFirebaseConfigured(isConfigured);
-
-    // Load user progress
+    // Load user progress and favorites
     const initData = async () => {
       try {
-        const [prog, session] = await Promise.all([
+        const [prog, session, favs] = await Promise.all([
           getAllProgress(userId),
-          getLastSession(userId)
+          getLastSession(userId),
+          getFavorites(userId)
         ]);
         setProgressMap(prog);
         setLastSession(session);
+        setFavorites(favs);
       } catch (err) {
         console.error('Error initializing tracker data:', err);
       }
@@ -133,7 +135,13 @@ export const App: React.FC = () => {
     }
   }, [activeTrack]);
 
-  // 7. Add Custom Tracks / SoundCloud
+  // 7. Favorite Toggle
+  const handleToggleFavorite = async (surahNumber: number) => {
+    const updated = await toggleFavorite(userId, surahNumber);
+    setFavorites(updated);
+  };
+
+  // 8. Add Custom Tracks / SoundCloud
   const handleAddCustomTracks = (newTracks: Track[]) => {
     setTracks(prev => [...newTracks, ...prev]);
     if (newTracks.length > 0) {
@@ -176,6 +184,8 @@ export const App: React.FC = () => {
           activeTrackId={activeTrack?.id || null}
           isPlaying={isPlaying}
           progressMap={progressMap}
+          favorites={favorites}
+          onToggleFavorite={handleToggleFavorite}
           onSelectTrack={handleSelectTrack}
         />
       </main>

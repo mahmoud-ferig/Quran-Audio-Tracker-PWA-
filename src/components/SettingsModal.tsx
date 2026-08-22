@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Copy, Check, Cloud, Database, Music } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
 import { getSavedFirebaseConfig, saveFirebaseConfig } from '../firebase/config';
@@ -23,24 +23,9 @@ export const SettingsModal: React.FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'firebase' | 'soundcloud' | 'user'>('firebase');
   const [copied, setCopied] = useState(false);
   const [inputUserId, setInputUserId] = useState(userId);
-  const [scClientId, setScClientId] = useState(getSoundCloudClientId());
+  const [scClientId, setScClientId] = useState(() => getSoundCloudClientId());
 
-  const [fbConfig, setFbConfig] = useState<FirebaseConfigState>({
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
-  });
-
-  useEffect(() => {
-    if (isOpen) {
-      setFbConfig(getSavedFirebaseConfig());
-      setScClientId(getSoundCloudClientId());
-      setInputUserId(userId);
-    }
-  }, [isOpen, userId]);
+  const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getSavedFirebaseConfig());
 
   if (!isOpen) return null;
 

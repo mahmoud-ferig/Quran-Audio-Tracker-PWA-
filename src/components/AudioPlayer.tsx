@@ -9,10 +9,13 @@ import {
   Repeat, 
   Repeat1, 
   Volume2, 
-  VolumeX
+  Volume1,
+  VolumeX,
+  Moon,
+  Loader2
 } from 'lucide-react';
-import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode } from '../types';
-import { saveProgress, getTrackProgress, saveLastSession } from '../services/storage';
+import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
+import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting, setAutoplaySetting } from '../services/storage';
 
 interface Props {
   track: Track | null;
@@ -23,6 +26,14 @@ interface Props {
 }
 
 const SPEED_OPTIONS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+const SLEEP_OPTIONS: { label: string; value: SleepTimerOption }[] = [
+  { label: 'Off', value: 0 },
+  { label: '15 min', value: 15 },
+  { label: '30 min', value: 30 },
+  { label: '45 min', value: 45 },
+  { label: '60 min', value: 60 },
+  { label: 'End of Surah', value: 'surah' }
+];
 
 export const AudioPlayer: React.FC<Props> = ({
   track,
@@ -34,11 +45,19 @@ export const AudioPlayer: React.FC<Props> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1.0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('none');
+  const [autoplayNext, setAutoplayNext] = useState<boolean>(() => getAutoplaySetting());
+  const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Sleep Timer state
+  const [sleepTimer, setSleepTimer] = useState<SleepTimerOption>(0);
+  const [sleepRemainingSeconds, setSleepRemainingSeconds] = useState<number | null>(null);
+  const [isSleepMenuOpen, setIsSleepMenuOpen] = useState(false);
 
   const lastSavedTimeRef = useRef<number>(0);
 
@@ -97,6 +116,113 @@ export const AudioPlayer: React.FC<Props> = ({
     [track, duration, userId, onProgressUpdated]
   );
 
+  // Audio Event Handlers & Controls
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const now = audioRef.current.currentTime;
+    setCurrentTime(now);
+
+    // Throttled background save: every 15s of playback delta
+    if (Math.abs(now - lastSavedTimeRef.current) >= 15) {
+      persistProgress(now);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (!audioRef.current) return;
+    const dur = audioRef.current.duration;
+    if (dur && !isNaN(dur)) {
+      setDuration(dur);
+    }
+    audioRef.current
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
+  };
+
+  const handleTogglePlay = useCallback(() => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      persistProgress();
+    } else {
+      audioRef.current.play().then(() => setIsPlaying(true)).catch((e) => console.error('Play error:', e));
+    }
+  }, [isPlaying, persistProgress]);
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = parseFloat(e.target.value);
+    setCurrentTime(newTime);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
+  };
+
+  const handleSeekCommit = () => {
+    persistProgress();
+  };
+
+  const handleSkip = useCallback((seconds: number) => {
+    if (!audioRef.current) return;
+    const nextTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
+    audioRef.current.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  }, [duration]);
+
+  const toggleMute = useCallback(() => {
+    if (audioRef.current) {
+      const nextMute = !isMuted;
+      audioRef.current.muted = nextMute;
+      setIsMuted(nextMute);
+    }
+  }, [isMuted]);
+
+  const handleTrackEnded = () => {
+    persistProgress(0, true);
+
+    // If Sleep Timer is set to end of surah
+    if (sleepTimer === 'surah') {
+      setIsPlaying(false);
+      setSleepTimer(0);
+      return;
+    }
+
+    if (repeatMode === 'one') {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
+    } else if (repeatMode === 'all' || autoplayNext) {
+      onNextTrack();
+    } else {
+      setIsPlaying(false);
+    }
+  };
+
+  const cycleSpeed = () => {
+    const currentIndex = SPEED_OPTIONS.indexOf(playbackSpeed);
+    const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
+    const newSpeed = SPEED_OPTIONS[nextIndex];
+    setPlaybackSpeed(newSpeed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newSpeed;
+    }
+  };
+
+  const toggleRepeat = () => {
+    if (repeatMode === 'none') setRepeatMode('all');
+    else if (repeatMode === 'all') setRepeatMode('one');
+    else setRepeatMode('none');
+  };
+
+  const handleAutoplayToggle = () => {
+    const nextVal = !autoplayNext;
+    setAutoplayNext(nextVal);
+    setAutoplaySetting(nextVal);
+  };
+
   // 1. Fetch saved progress on track change
   useEffect(() => {
     if (!track) return;
@@ -108,7 +234,6 @@ export const AudioPlayer: React.FC<Props> = ({
         const saved = await getTrackProgress(userId, track.id);
         if (saved && saved.currentTime > 0 && isMounted) {
           if (audioRef.current) {
-            // Restore playback position
             audioRef.current.currentTime = saved.currentTime;
             setCurrentTime(saved.currentTime);
             lastSavedTimeRef.current = saved.currentTime;
@@ -124,7 +249,7 @@ export const AudioPlayer: React.FC<Props> = ({
     return () => {
       isMounted = false;
     };
-  }, [track?.id, userId]);
+  }, [track, userId]);
 
   // 2. Setup MediaSession API
   useEffect(() => {
@@ -193,7 +318,29 @@ export const AudioPlayer: React.FC<Props> = ({
     };
   }, [track, persistProgress, onPrevTrack, onNextTrack]);
 
-  // 3. Save on window unload / minimize
+  // 3. Sleep Timer interval countdown
+  useEffect(() => {
+    if (typeof sleepTimer === 'number' && sleepTimer > 0) {
+      const interval = setInterval(() => {
+        setSleepRemainingSeconds((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            if (audioRef.current) {
+              audioRef.current.pause();
+              setIsPlaying(false);
+            }
+            setSleepTimer(0);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [sleepTimer]);
+
+  // 4. Save on window unload / minimize
   useEffect(() => {
     const handleUnload = () => {
       if (audioRef.current && audioRef.current.currentTime > 0) {
@@ -210,89 +357,48 @@ export const AudioPlayer: React.FC<Props> = ({
     };
   }, [persistProgress]);
 
-  // Audio Event Handlers
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const now = audioRef.current.currentTime;
-    setCurrentTime(now);
-
-    // Throttled background save: every 15s of playback delta
-    if (Math.abs(now - lastSavedTimeRef.current) >= 15) {
-      persistProgress(now);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current) return;
-    const dur = audioRef.current.duration;
-    if (dur && !isNaN(dur)) {
-      setDuration(dur);
-    }
-    // Auto-play when user selects a new track
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-  };
-
-  const handleTogglePlay = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      persistProgress();
-    } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch((e) => console.error('Play error:', e));
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
-  };
-
-  const handleSeekCommit = () => {
-    persistProgress();
-  };
-
-  const handleSkip = (seconds: number) => {
-    if (!audioRef.current) return;
-    const nextTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
-    audioRef.current.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  };
-
-  const handleTrackEnded = () => {
-    persistProgress(0, true);
-
-    if (repeatMode === 'one') {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
+  // 5. Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')
+      ) {
+        return;
       }
-    } else if (repeatMode === 'all') {
-      onNextTrack();
-    } else {
-      setIsPlaying(false);
-    }
-  };
 
-  const cycleSpeed = () => {
-    const currentIndex = SPEED_OPTIONS.indexOf(playbackSpeed);
-    const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
-    const newSpeed = SPEED_OPTIONS[nextIndex];
-    setPlaybackSpeed(newSpeed);
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleTogglePlay();
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        handleSkip(10);
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        handleSkip(-10);
+      } else if (e.code === 'KeyM') {
+        e.preventDefault();
+        toggleMute();
+      } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        setVolume((v) => Math.min(1, Math.round((v + 0.1) * 10) / 10));
+      } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        setVolume((v) => Math.max(0, Math.round((v - 0.1) * 10) / 10));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleTogglePlay, handleSkip, toggleMute]);
+
+  // Volume synchronization
+  useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.playbackRate = newSpeed;
+      audioRef.current.volume = isMuted ? 0 : volume;
     }
-  };
-
-  const toggleRepeat = () => {
-    if (repeatMode === 'none') setRepeatMode('all');
-    else if (repeatMode === 'all') setRepeatMode('one');
-    else setRepeatMode('none');
-  };
+  }, [volume, isMuted]);
 
   if (!track) return null;
 
@@ -304,11 +410,16 @@ export const AudioPlayer: React.FC<Props> = ({
         preload="metadata"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => {
+          setIsBuffering(false);
+          setIsPlaying(true);
+        }}
+        onCanPlay={() => setIsBuffering(false)}
         onPause={() => {
           setIsPlaying(false);
           persistProgress();
         }}
-        onPlay={() => setIsPlaying(true)}
         onEnded={handleTrackEnded}
       />
 
@@ -337,7 +448,7 @@ export const AudioPlayer: React.FC<Props> = ({
             <button
               className={`control-btn ${repeatMode !== 'none' ? 'active' : ''}`}
               onClick={toggleRepeat}
-              title={`Repeat: ${repeatMode}`}
+              title={`Repeat: ${repeatMode === 'none' ? 'Off' : repeatMode === 'one' ? 'Repeat 1' : 'Repeat All'}`}
               aria-label="Repeat mode"
             >
               {repeatMode === 'one' ? <Repeat1 size={17} /> : <Repeat size={17} />}
@@ -357,20 +468,22 @@ export const AudioPlayer: React.FC<Props> = ({
             <button
               className="control-btn"
               onClick={() => handleSkip(-10)}
-              title="Rewind 10 seconds"
+              title="Rewind 10 seconds (←)"
               aria-label="Rewind 10 seconds"
             >
               <RotateCcw size={18} />
             </button>
 
-            {/* Play / Pause Main Button */}
+            {/* Play / Pause Main Button with Buffering state */}
             <button
               className="play-pause-btn"
               onClick={handleTogglePlay}
-              title={isPlaying ? 'Pause' : 'Play'}
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
-              {isPlaying ? (
+              {isBuffering ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : isPlaying ? (
                 <Pause size={20} fill="currentColor" />
               ) : (
                 <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />
@@ -381,7 +494,7 @@ export const AudioPlayer: React.FC<Props> = ({
             <button
               className="control-btn"
               onClick={() => handleSkip(10)}
-              title="Forward 10 seconds"
+              title="Forward 10 seconds (→)"
               aria-label="Forward 10 seconds"
             >
               <RotateCw size={18} />
@@ -425,20 +538,121 @@ export const AudioPlayer: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Right: Quick Options / Mute */}
-        <div className="player-options-right">
+        {/* Right: Quick Options / Sleep / Volume */}
+        <div className="player-options-right" style={{ position: 'relative' }}>
+          {/* Autoplay Next Surah Toggle */}
           <button
-            className="control-btn"
-            onClick={() => {
-              if (audioRef.current) {
-                audioRef.current.muted = !isMuted;
-                setIsMuted(!isMuted);
-              }
-            }}
-            title={isMuted ? 'Unmute' : 'Mute'}
+            className={`control-btn ${autoplayNext ? 'active' : ''}`}
+            onClick={handleAutoplayToggle}
+            title={autoplayNext ? 'Autoplay Next Surah: ON' : 'Autoplay Next Surah: OFF'}
+            style={{ fontSize: '0.75rem', fontWeight: 600, padding: '4px 8px', width: 'auto' }}
           >
-            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            Auto {autoplayNext ? '✓' : '✗'}
           </button>
+
+          {/* Sleep Timer Button */}
+          <button
+            className={`control-btn ${sleepTimer !== 0 ? 'active' : ''}`}
+            onClick={() => setIsSleepMenuOpen(!isSleepMenuOpen)}
+            title={
+              sleepRemainingSeconds !== null
+                ? `Sleep timer: ${Math.ceil(sleepRemainingSeconds / 60)}m left`
+                : sleepTimer === 'surah'
+                ? 'Sleep at end of Surah'
+                : 'Set Sleep Timer'
+            }
+          >
+            <Moon size={17} />
+            {sleepRemainingSeconds !== null && (
+              <span style={{ fontSize: '0.68rem', marginLeft: 3 }}>
+                {Math.ceil(sleepRemainingSeconds / 60)}m
+              </span>
+            )}
+          </button>
+
+          {/* Sleep Menu Popover */}
+          {isSleepMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                right: 0,
+                marginBottom: '10px',
+                background: 'var(--bg-surface-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '12px',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                zIndex: 100,
+                minWidth: '130px'
+              }}
+            >
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '4px 8px', fontWeight: 600 }}>
+                Sleep Timer
+              </div>
+              {SLEEP_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  className={`control-btn ${sleepTimer === opt.value ? 'active' : ''}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'flex-start',
+                    padding: '6px 10px',
+                    fontSize: '0.8rem',
+                    borderRadius: '8px',
+                    textAlign: 'left'
+                  }}
+                  onClick={() => {
+                    setSleepTimer(opt.value);
+                    setSleepRemainingSeconds(typeof opt.value === 'number' && opt.value > 0 ? opt.value * 60 : null);
+                    setIsSleepMenuOpen(false);
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Volume Control */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              className="control-btn"
+              onClick={toggleMute}
+              title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX size={18} />
+              ) : volume < 0.5 ? (
+                <Volume1 size={18} />
+              ) : (
+                <Volume2 size={18} />
+              )}
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                const newVol = parseFloat(e.target.value);
+                setVolume(newVol);
+                if (isMuted && newVol > 0) setIsMuted(false);
+              }}
+              style={{
+                width: '60px',
+                height: '4px',
+                accentColor: 'var(--accent-emerald)',
+                cursor: 'pointer'
+              }}
+              title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+            />
+          </div>
         </div>
       </div>
     </div>

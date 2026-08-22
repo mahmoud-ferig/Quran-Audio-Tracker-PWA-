@@ -1,9 +1,11 @@
-import { initializeFirebase, doc, getDoc, setDoc, getDocs, collection } from '../firebase/config';
+import { initializeFirebase, doc, getDoc, setDoc, getDocs, collection, query, where } from '../firebase/config';
 import type { ListeningProgress, LastSession } from '../types';
 
 const STORAGE_KEY_USER_ID = 'quran_tracker_user_id';
 const STORAGE_KEY_LOCAL_PROGRESS = 'quran_tracker_local_progress';
 const STORAGE_KEY_LOCAL_LAST_SESSION = 'quran_tracker_local_last_session';
+const STORAGE_KEY_LOCAL_FAVORITES = 'quran_tracker_local_favorites';
+const STORAGE_KEY_AUTOPLAY = 'quran_tracker_autoplay';
 
 /**
  * Get or generate a persistent unique User ID for syncing across devices
@@ -114,7 +116,7 @@ export async function getTrackProgress(
 }
 
 /**
- * Fetch all progress records for user
+ * Fetch all progress records for user (using scoped query for privacy & efficiency)
  */
 export async function getAllProgress(
   userId: string
@@ -125,13 +127,12 @@ export async function getAllProgress(
   if (isConfigured && db) {
     try {
       const colRef = collection(db, 'listening_progress');
-      const snap = await getDocs(colRef);
+      const q = query(colRef, where('userId', '==', userId));
+      const snap = await getDocs(q);
       snap.forEach((d) => {
-        const data = d.data() as ListeningProgress & { userId?: string };
-        if (data.userId === userId || d.id.startsWith(userId + '_')) {
-          if (!localMap[data.trackId] || new Date(data.updatedAt) > new Date(localMap[data.trackId].updatedAt)) {
-            localMap[data.trackId] = data;
-          }
+        const data = d.data() as ListeningProgress;
+        if (!localMap[data.trackId] || new Date(data.updatedAt) > new Date(localMap[data.trackId].updatedAt)) {
+          localMap[data.trackId] = data;
         }
       });
       saveLocalProgressMap(localMap);
@@ -204,4 +205,76 @@ export async function getLastSession(
   }
 
   return localSession;
+}
+
+/**
+ * Favorites Management
+ */
+export function getLocalFavorites(): number[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LOCAL_FAVORITES);
+    return raw ? JSON.parse(raw) : [1, 18, 36, 55, 67, 112, 113, 114]; // Default popular surahs
+  } catch (e) {
+    console.error('Error reading favorites:', e);
+    return [1, 18, 36, 55, 67, 112, 113, 114];
+  }
+}
+
+export async function getFavorites(userId: string): Promise<number[]> {
+  const local = getLocalFavorites();
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_favorites', userId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.surahNumbers)) {
+          localStorage.setItem(STORAGE_KEY_LOCAL_FAVORITES, JSON.stringify(data.surahNumbers));
+          return data.surahNumbers;
+        }
+      }
+    } catch (err) {
+      console.warn('Firestore favorites fetch failed, using local cache:', err);
+    }
+  }
+
+  return local;
+}
+
+export async function toggleFavorite(userId: string, surahNumber: number): Promise<number[]> {
+  const current = getLocalFavorites();
+  const exists = current.includes(surahNumber);
+  const updated = exists ? current.filter(n => n !== surahNumber) : [...current, surahNumber];
+
+  localStorage.setItem(STORAGE_KEY_LOCAL_FAVORITES, JSON.stringify(updated));
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_favorites', userId);
+      await setDoc(docRef, {
+        userId,
+        surahNumbers: updated,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore favorites update failed:', err);
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Autoplay Settings
+ */
+export function getAutoplaySetting(): boolean {
+  const val = localStorage.getItem(STORAGE_KEY_AUTOPLAY);
+  return val === null ? true : val === 'true';
+}
+
+export function setAutoplaySetting(enabled: boolean): void {
+  localStorage.setItem(STORAGE_KEY_AUTOPLAY, enabled ? 'true' : 'false');
 }

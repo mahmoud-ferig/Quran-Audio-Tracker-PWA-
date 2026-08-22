@@ -7,6 +7,8 @@ import {
   setDoc, 
   getDocs, 
   collection, 
+  query,
+  where,
   Firestore 
 } from 'firebase/firestore';
 import type { FirebaseConfigState } from '../types';
@@ -72,4 +74,4 @@ export function initializeFirebase(): { app: FirebaseApp | null; db: Firestore |
   }
 }
 
-export { doc, getDoc, setDoc, getDocs, collection };
+export { doc, getDoc, setDoc, getDocs, collection, query, where };

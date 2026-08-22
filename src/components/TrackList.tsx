@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Volume2 } from 'lucide-react';
+import { Search, Volume2, Star } from 'lucide-react';
 import type { Track, ListeningProgress } from '../types';
 
 interface Props {
@@ -7,6 +7,8 @@ interface Props {
   activeTrackId: string | null;
   isPlaying: boolean;
   progressMap: Record<string, ListeningProgress>;
+  favorites: number[];
+  onToggleFavorite: (surahNumber: number) => void;
   onSelectTrack: (track: Track) => void;
 }
 
@@ -15,10 +17,12 @@ export const TrackList: React.FC<Props> = ({
   activeTrackId,
   isPlaying,
   progressMap,
+  favorites,
+  onToggleFavorite,
   onSelectTrack
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'Meccan' | 'Medinan' | 'progress'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'favorites' | 'Meccan' | 'Medinan' | 'progress'>('all');
 
   const filteredTracks = useMemo(() => {
     return tracks.filter((track) => {
@@ -30,6 +34,7 @@ export const TrackList: React.FC<Props> = ({
 
       if (!matchesSearch) return false;
 
+      if (filterType === 'favorites') return favorites.includes(track.surahNumber);
       if (filterType === 'Meccan') return track.revelationType === 'Meccan';
       if (filterType === 'Medinan') return track.revelationType === 'Medinan';
       if (filterType === 'progress') {
@@ -39,7 +44,7 @@ export const TrackList: React.FC<Props> = ({
 
       return true;
     });
-  }, [tracks, searchQuery, filterType, progressMap]);
+  }, [tracks, searchQuery, filterType, favorites, progressMap]);
 
   const inProgressCount = useMemo(() => {
     return Object.values(progressMap).filter((p) => p.currentTime > 5 && p.percentage < 98).length;
@@ -83,6 +88,24 @@ export const TrackList: React.FC<Props> = ({
           onClick={() => setFilterType('all')}
         >
           All ({tracks.length})
+        </button>
+
+        <button
+          className={`control-btn ${filterType === 'favorites' ? 'active' : ''}`}
+          style={{
+            padding: '6px 14px',
+            width: 'auto',
+            borderRadius: '9999px',
+            background: filterType === 'favorites' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+            border: filterType === 'favorites' ? '1px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
+            color: filterType === 'favorites' ? 'var(--accent-gold-light)' : 'var(--text-secondary)',
+            fontSize: '0.82rem',
+            fontWeight: 600
+          }}
+          onClick={() => setFilterType('favorites')}
+        >
+          <Star size={13} fill={filterType === 'favorites' ? 'currentColor' : 'none'} style={{ marginRight: 5, verticalAlign: 'middle' }} />
+          Favorites ({favorites.length})
         </button>
 
         <button
@@ -143,6 +166,7 @@ export const TrackList: React.FC<Props> = ({
       <div className="tracks-grid">
         {filteredTracks.map((track) => {
           const isActive = track.id === activeTrackId;
+          const isFav = favorites.includes(track.surahNumber);
           const prog = progressMap[track.id];
           const hasProgress = prog && prog.percentage > 0;
           const isComplete = prog && prog.percentage >= 98;
@@ -187,19 +211,42 @@ export const TrackList: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="track-right">
-                <div className="track-arabic">
-                  {track.arabicName}
+              <div className="track-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {track.surahNumber > 0 && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      color: isFav ? 'var(--accent-gold)' : 'var(--text-muted)',
+                      border: 'none',
+                      background: isFav ? 'rgba(245, 158, 11, 0.12)' : 'transparent'
+                    }}
+                    title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFavorite(track.surahNumber);
+                    }}
+                  >
+                    <Star size={16} fill={isFav ? 'currentColor' : 'none'} />
+                  </button>
+                )}
+
+                <div style={{ textAlign: 'right' }}>
+                  <div className="track-arabic">
+                    {track.arabicName}
+                  </div>
+                  {isComplete ? (
+                    <span className="progress-pill" style={{ color: 'var(--accent-emerald-light)' }}>
+                      Completed ✓
+                    </span>
+                  ) : hasProgress ? (
+                    <span className="progress-pill">
+                      {prog.percentage}% saved
+                    </span>
+                  ) : null}
                 </div>
-                {isComplete ? (
-                  <span className="progress-pill" style={{ color: 'var(--accent-emerald-light)' }}>
-                    Completed ✓
-                  </span>
-                ) : hasProgress ? (
-                  <span className="progress-pill">
-                    {prog.percentage}% saved
-                  </span>
-                ) : null}
               </div>
 
               {/* Progress bar at the bottom of the card */}
