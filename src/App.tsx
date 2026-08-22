@@ -48,7 +48,7 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCustomStreamOpen, setIsCustomStreamOpen] = useState(false);
 
-  // 1. Initial & Account Change Load
+  // 1. Initial & Account Change Load + Auto-Sync on Tab Focus
   useEffect(() => {
     const initData = async () => {
       try {
@@ -75,6 +75,21 @@ export const App: React.FC = () => {
     };
 
     initData();
+
+    // Auto sync when user switches tabs or unlocks their phone
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        initData();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, [userId]);
 
   // 2. Handle Reciter Change
