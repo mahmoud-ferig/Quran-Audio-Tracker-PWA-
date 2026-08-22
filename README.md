@@ -2,16 +2,17 @@
 
 # 📖 Quran Audio Tracker (PWA)
 
-**A lightweight, cross-platform, battery-optimized Quran recitation tracker with real-time multi-device cloud synchronization.**
+**A modern, lightweight, mobile-first Quran recitation player with real-time multi-device cloud synchronization, 100% offline playback, and native PWA support.**
 
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-quran--player.muslimhub.link-059669?style=for-the-badge&logo=cloudflare&logoColor=white)](https://quran-player.muslimhub.link)
+[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Vite 8](https://img.shields.io/badge/Vite-8.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
-[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![PWA Ready](https://img.shields.io/badge/PWA-Installable-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge)](LICENSE)
 
-[Live Demo](#) • [Features](#-features) • [Installation](#-getting-started) • [Firebase Setup](#-firebase-configuration) • [PWA Guide](#-pwa-installation)
+[🌐 Live App](https://quran-player.muslimhub.link) • [✨ Features](#-key-features) • [📶 Offline Mode](#-100-offline-capability) • [🎨 Themes & Accents](#-theming--customization) • [⚙️ Setup](#-getting-started) • [📱 PWA & Lock-Screen Guide](#-mobile-installation--lock-screen-controls)
 
 </div>
 
@@ -19,9 +20,89 @@
 
 ## 🌟 Overview
 
-**Quran Audio Tracker** is a high-performance Progressive Web Application (PWA) designed to solve the problem of losing your listening position across devices. Whether you listen on your smartphone during your commute or on your laptop at home, your playback position, active Surah, and reciter preferences stay seamlessly synchronized.
+**Quran Audio Tracker** is a high-performance, battery-optimized Progressive Web Application (PWA) created to eliminate the frustration of losing your listening position across different devices. 
 
-Built with a **zero-overhead architecture**, it uses pure HTML5 hardware audio decoding and throttled Firestore writes to ensure ultra-low battery consumption and fluid performance even on older mobile devices.
+Whether you listen on your smartphone during your daily commute or on your laptop at home, your playback position, active Surah, favorites, and reciter preferences stay seamlessly synchronized across all your devices via Cloud Firestore.
+
+---
+
+## ✨ Key Features
+
+### 🎛️ 1. Modern Audio Player Experience
+- **Persistent Floating Mini-Player Bar:** Always visible and anchored at the bottom of the screen, pre-loaded with your last session so you can resume listening with a single tap.
+- **Expandable Full-Screen Player Sheet:** Tap the mini-player pill to reveal a stunning full-screen Now-Playing sheet featuring:
+  - Centerpiece gold Arabic calligraphy medallion.
+  - Live animated audio equalizer waves.
+  - High-precision timeline scrubber with formatted timestamps.
+  - Hero playback controls (`Play / Pause`, `±10s Seek`, `Next / Prev`).
+  - **🌙 Sleep Timer:** Automatic shut-off after 15m, 30m, 45m, 60m, or at the End of Surah.
+  - **⚡ Variable Playback Speed:** 0.75x, 1.0x, 1.25x, 1.5x, 1.75x, 2.0x.
+  - **⭐ 1-Tap Favorites:** Star Surahs to pin and easily filter your favorite recitations.
+  - **📤 Native Share:** Share the currently playing Surah directly to WhatsApp, Telegram, or social media.
+
+### 📶 2. 100% Offline Capability (Airplane Mode)
+- **Automatic Smart Caching:** Streams are automatically cached via Workbox `CacheFirst` runtime caching.
+- **📥 1-Tap Manual Download for Offline:** Tap the download icon in the Full-Screen player to download and store any Surah into your browser's persistent `CacheStorage` for zero-data listening on flights or travels.
+- **Complete App Shell Offline:** The entire 114 Surahs catalog, Arabic typography, and tracker interface work completely without an internet connection.
+
+### ☁️ 3. Seamless Multi-Device Email Sync
+- **No Passwords Required:** Simply enter your email address in Settings to instantly link and sync your listening timestamps, favorites, and settings across your phone, tablet, and computer.
+- **Zero Data Loss:** Offline updates are stored locally and automatically pushed to Cloud Firestore the moment internet connectivity returns.
+
+### 🎙️ 4. 8 World-Class Reciters & Recitation Styles
+- **Story-Style Reciter Carousel:** Horizontal story avatars with style filter chips (*All*, *Murattal*, *Mujawwad*, *Haram Makkah*):
+  1. Sheikh Mishary Rashid Alafasy (مشاري بن راشد العفاسي)
+  2. Sheikh Abdul Rahman Al-Sudais (عبد الرحمن السديس)
+  3. Sheikh Maher Al-Muaiqly (ماهر المعيقلي)
+  4. Sheikh Yasser Al-Dosari (ياسر الدوسري)
+  5. Sheikh Abu Bakr Al-Shatri (أبو بكر الشاطري)
+  6. Sheikh Saad Al-Ghamdi (سعد الغامدي)
+  7. Sheikh Mahmoud Khalil Al-Husary (محمود خليل الحصري)
+  8. Sheikh Abdulbasit Abdulsamad (عبد الباسط عبد الصمد)
+
+### 📜 5. Full 114 Surahs Catalog & Instant Search
+- **Islamic Geometry Badges:** Octagonal calligraphy numbers with live soundwave animations on active tracks.
+- **Quick Filters:** Filter by *All*, *Favorites (⭐)*, *In Progress (⏳)*, *Meccan (مكية)*, or *Medinan (مدنية)*.
+- **Live Search:** Instant fuzzy search across Surah numbers, English names, and Arabic calligraphy.
+
+### 📏 6. Slim & Compact "Resume Recitation" Banner
+- Space-efficient, single-row banner showing your last active Surah, reciter, timestamp, and completion percentage without cluttering your screen.
+
+---
+
+## 🎨 Theming & Customization
+
+Switch seamlessly between Light and Dark themes, paired with 4 curated accent colors:
+
+| Accent Palette | Primary Color | Description |
+| :--- | :--- | :--- |
+| **Emerald Oasis** (Default) | `#059669` | Classic Islamic architectural emerald green |
+| **Royal Gold** | `#d97706` | Warm, radiant gilded amber |
+| **Royal Indigo** | `#4f46e5` | Deep, serene nocturnal indigo |
+| **Sapphire Blue** | `#0284c7` | Crisp, modern ocean sapphire |
+
+---
+
+## 📱 Mobile Installation & Lock-Screen Controls
+
+### Installing as a Native PWA App:
+- **On Android (Chrome / Samsung Internet):**
+  1. Open [https://quran-player.muslimhub.link](https://quran-player.muslimhub.link).
+  2. Tap the `⋮` menu ➔ **"Install app"** (or **"Add to Home screen"**).
+- **On iOS (iPhone / iPad - Safari):**
+  1. Open the URL in **Safari**.
+  2. Tap the **Share** button ➔ **"Add to Home Screen"**.
+- **On Windows (Chrome / Edge):**
+  1. Open the URL ➔ click the **"Install" icon** in the browser address bar.
+  2. Runs as a standalone frameless Windows app pinned to your Taskbar.
+
+### 🎛️ Lock-Screen & Drop-Down Menu Controls:
+The app integrates with the **HTML5 MediaSession API** to provide background playback and lock-screen controls:
+- **Notification Drop-Down Shade:** Play, pause, scrub timestamps, and skip Surahs.
+- **Lock Screen:** High-res Surah artwork medallion, title, and scrubber.
+
+> [!TIP]
+> **Android Notification Settings:** On Android 13+, ensure that notifications for your browser or the installed PWA are enabled in **Android Settings ➔ Apps ➔ Chrome/Quran Player ➔ Notifications (Allowed)** so Android displays the media control card.
 
 ---
 
@@ -33,63 +114,40 @@ Built with a **zero-overhead architecture**, it uses pure HTML5 hardware audio d
    │   - Vite 8 & vite-plugin-pwa (Standalone App)          │
    │   - Hardware-Accelerated HTML5 <audio> Engine          │
    │   - MediaSession API (Lock-screen & Background Audio)  │
-   │   - Obsidian & Emerald Glassmorphic Design System      │
+   │   - Mobile-First Glassmorphic CSS Design System        │
+   │   - Workbox Offline Runtime Audio CacheStorage         │
    └───────────────┬────────────────────────┬───────────────┘
                    │                        │
-       1. Stream Quran / SoundCloud    2. Sync timestamps & bookmarks
+       1. Stream MP3Quran CDN / Custom  2. Real-time timestamp sync
                    │                        │
                    ▼                        ▼
        ┌───────────────────────┐  ┌────────────────────────┐
-       │   High-Speed Audio    │  │  Firebase Cloud        │
-       │   CDNs & SoundCloud   │  │  Firestore (Modular v9)│
-       │   (114 Surahs)        │  │  + Offline Local Cache │
+       │  High-Speed Quran     │  │  Firebase Cloud        │
+       │  Audio CDN Servers    │  │  Firestore (Modular v9)│
+       │  (114 Surahs)         │  │  + Offline LocalStorage│
        └───────────────────────┘  └────────────────────────┘
 ```
 
-- **Frontend Core:** React 19, TypeScript, Vite
-- **Mobile Engine:** Progressive Web App (PWA) with Service Worker offline caching
-- **Database & Sync:** Cloud Firestore (Modular Web SDK v9) with instant LocalStorage fallback
+- **Frontend Core:** React 19, TypeScript, Vite 8
+- **PWA & Offline:** `vite-plugin-pwa`, Workbox Service Worker, Browser Cache API
+- **Database & Sync:** Cloud Firestore with automatic `localStorage` fallback
 - **Audio Engine:** Native HTML5 Audio + `navigator.mediaSession`
-- **Styling:** Bespoke Obsidian & Emerald Glassmorphic CSS Design System
-
----
-
-## ✨ Features
-
-- 📱 **Zero-Overhead Mobile PWA:** Installs directly to iOS and Android home screens as a native-feeling standalone app without app store bloat.
-- 🔄 **Cross-Device Progress Sync:** Automatically remembers your exact second and Surah across phone, tablet, and desktop.
-- ⚡ **Battery & Data Optimized:** Hardware-accelerated audio streaming with throttled background database sync (only saves on pause, track end, or periodic checkpoints).
-- 🔒 **Lock-Screen & Background Playback:** Full integration with Android Notifications, iOS Control Center, and lock-screen media controls via the `MediaSession` API.
-- 🎙️ **8 Curated World-Class Reciters:**
-  - Sheikh Mishary Rashid Alafasy (مشاري بن راشد العفاسي)
-  - Sheikh Abdul Rahman Al-Sudais (عبد الرحمن السديس)
-  - Sheikh Maher Al-Muaiqly (ماهر المعيقلي)
-  - Sheikh Yasser Al-Dosari (ياسر الدوسري)
-  - Sheikh Abu Bakr Al-Shatri (أبو بكر الشاطري)
-  - Sheikh Saad Al-Ghamdi (سعد الغامدي)
-  - Sheikh Mahmoud Khalil Al-Husary (محمود خليل الحصري)
-  - Sheikh Abdulbasit Abdulsamad (عبد الباسط عبد الصمد)
-- 📜 **Full 114 Surahs Catalog:** Complete with Arabic calligraphy typography, English transliteration, English meaning, verse count, and Meccan/Medinan tags.
-- 🔍 **Instant Real-Time Search & Filtering:** Filter Surahs by number, Arabic title, English name, Meccan/Medinan classification, or "In-Progress" status.
-- 🎛️ **Full Player Controls:** Variable playback speed (0.75x – 2.0x), quick ±10s seek, repeat track/playlist modes, and time scrubber.
-- 🔗 **Custom Stream & SoundCloud Importer:** Paste custom direct MP3/AAC audio streams or import SoundCloud playlists by ID.
-- 🛡️ **Graceful Offline Mode:** Fully functional out-of-the-box using local storage persistence even without configuring Firebase keys.
+- **Icons & Typography:** Lucide React, Google Amiri & Plus Jakarta Sans fonts
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - [Node.js](https://nodejs.org/) (version 18.0 or higher)
-- `npm`, `pnpm`, or `yarn`
+- `npm` / `pnpm` / `yarn`
 
-### Installation
+### Installation & Local Development
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/quran-audio-tracker.git
-   cd quran-audio-tracker
+   git clone https://github.com/mahmoud-ferig/Quran-Audio-Tracker-PWA-.git
+   cd quranPlayer
    ```
 
 2. **Install dependencies:**
@@ -103,115 +161,36 @@ Built with a **zero-overhead architecture**, it uses pure HTML5 hardware audio d
    ```
    Open your browser at `http://localhost:5173`.
 
-4. **Build for production:**
+4. **Build and test for production:**
    ```bash
    npm run build
    ```
 
 ---
 
-## ⚙️ Firebase Configuration
+## ⚙️ Cloud Firestore Deployment & Security Rules
 
-The app works in **Offline Local Mode** by default. To enable cross-device cloud sync with Cloud Firestore:
-
-### 1. Create a Firebase Project
-1. Go to the [Firebase Console](https://console.firebase.google.com/).
-2. Click **Create a project**.
-3. Enable **Cloud Firestore** in test mode or production mode.
-
-### 2. Firestore Security Rules
-Add the following rules in your Firestore Rules tab:
+To configure your own Firebase backend:
+1. Create a project on the [Firebase Console](https://console.firebase.google.com/).
+2. Enable **Cloud Firestore**.
+3. Deploy the following security rules from `firestore.rules`:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /listening_progress/{document} {
-      allow read, write: if true; // Or restrict to authenticated users
+      allow read, write: if true;
+    }
+    match /user_favorites/{document} {
+      allow read, write: if true;
+    }
+    match /user_settings/{document} {
+      allow read, write: if true;
     }
   }
 }
 ```
-
-### 3. Connect Keys
-You can configure Firebase in two ways:
-
-#### Option A: In-App Settings Modal (Easiest)
-Click the **Settings (⚙️)** icon in the app header and paste your Firebase API Key, Project ID, and App ID.
-
-#### Option B: Environment Variables (`.env`)
-Create a `.env` file in the root folder:
-
-```env
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-VITE_SOUNDCLOUD_CLIENT_ID=optional_soundcloud_client_id
-```
-
----
-
-## 📱 PWA Installation
-
-### On iOS (iPhone / iPad)
-1. Open the deployed web app URL in **Safari**.
-2. Tap the **Share** icon (square with an arrow pointing up).
-3. Scroll down and tap **Add to Home Screen**.
-
-### On Android
-1. Open the web app URL in **Google Chrome**.
-2. Tap the three-dot menu icon in the top right.
-3. Tap **Install app** or **Add to Home screen**.
-
----
-
-## 📂 Project Structure
-
-```
-quranPlayer/
-├── public/
-│   ├── favicon.svg              # App icon & SVG vector logo
-│   └── robots.txt
-├── src/
-│   ├── components/
-│   │   ├── AudioPlayer.tsx      # Native HTML5 player with MediaSession & autosave
-│   │   ├── CustomStreamModal.tsx # MP3 & SoundCloud stream importer
-│   │   ├── Header.tsx           # App navbar, Sync ID & status indicator
-│   │   ├── ReciterSelector.tsx  # Reciter card carousel
-│   │   ├── ResumeBanner.tsx     # Hero banner for one-tap playback resume
-│   │   ├── SettingsModal.tsx    # Firebase & Sync ID manager modal
-│   │   └── TrackList.tsx        # Surahs list with search & filter chips
-│   ├── firebase/
-│   │   └── config.ts            # Modular Firebase initialization
-│   ├── services/
-│   │   ├── quranData.ts         # Catalog of 114 Surahs & 8 reciters
-│   │   ├── soundcloud.ts        # SoundCloud playlist fetcher & custom track builder
-│   │   └── storage.ts           # Unified Firestore + LocalStorage sync layer
-│   ├── types/
-│   │   └── index.ts             # TypeScript interfaces & models
-│   ├── App.tsx                  # Root application component
-│   ├── index.css                # Global design system & animations
-│   └── main.tsx                 # React DOM mount point
-├── index.html                   # HTML5 entry with PWA tags & Google Fonts
-├── vite.config.ts               # Vite configuration with vite-plugin-pwa
-├── tsconfig.json                # TypeScript project configuration
-└── package.json                 # Project dependencies & scripts
-```
-
----
-
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ---
 
@@ -220,5 +199,5 @@ Contributions, issues, and feature requests are welcome!
 Distributed under the **MIT License**. See `LICENSE` for more information.
 
 <div align="center">
-  <sub>Made with ❤️ for the global Muslim community. May it bring benefit.</sub>
+  <sub>Made with ❤️ for the global Muslim community. May it bring benefit and blessings.</sub>
 </div>
