@@ -250,6 +250,7 @@ export const App: React.FC = () => {
         <ReciterSelector
           selectedReciterId={selectedReciter.id}
           onSelectReciter={handleSelectReciter}
+          onOpenCustomStream={() => setIsCustomStreamOpen(true)}
         />
 
         {/* Surahs / Tracks List */}

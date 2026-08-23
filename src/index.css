@@ -266,54 +266,95 @@ body {
   flex-shrink: 0;
 }
 
-/* Unified Sync & Profile Interactive Pill */
-.header-profile-pill {
+/* ==========================================================================
+   UNIFIED NAVBAR CENTER ISLAND PILL (Custom Stream + Cloud Sync / Profile)
+   ========================================================================== */
+.navbar-center-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 3px 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.navbar-center-pill:hover {
+  border-color: var(--border-active);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.navbar-center-pill.synced {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.navbar-center-pill.local {
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.center-pill-btn {
+  background: transparent;
+  border: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 11px;
+  padding: 5px 10px;
   border-radius: 9999px;
   font-size: 0.76rem;
   font-weight: 600;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: var(--font-sans);
 }
 
-.header-profile-pill:hover {
-  background: var(--bg-card-hover);
+.center-pill-btn:hover {
+  background: var(--bg-card);
   color: var(--text-primary);
-  border-color: var(--border-active);
-  transform: translateY(-1px);
 }
 
-.header-profile-pill:active {
-  transform: scale(0.97);
+.center-pill-btn:active {
+  transform: scale(0.96);
 }
 
-.header-profile-pill.synced {
-  border-color: rgba(16, 185, 129, 0.35);
-  background: rgba(16, 185, 129, 0.08);
+.stream-action-btn {
+  color: var(--text-secondary);
+}
+
+.stream-action-btn:hover {
   color: var(--accent-emerald);
 }
 
-.header-profile-pill.local {
-  border-color: rgba(245, 158, 11, 0.3);
-  background: rgba(245, 158, 11, 0.08);
-  color: var(--accent-gold);
+.stream-icon-accent {
+  color: var(--accent-emerald);
+}
+
+.center-pill-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.account-action-btn {
+  color: var(--text-primary);
 }
 
 .sync-pulse-indicator {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--accent-emerald);
   display: inline-block;
-  box-shadow: 0 0 6px currentColor;
+  box-shadow: 0 0 6px var(--accent-emerald);
   flex-shrink: 0;
+}
+
+.navbar-center-pill.local .sync-pulse-indicator {
+  background: var(--accent-gold);
+  box-shadow: 0 0 6px var(--accent-gold);
 }
 
 .profile-pill-icon {
@@ -327,6 +368,16 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.center-pill-chevron {
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.account-action-btn:hover .center-pill-chevron {
+  color: var(--text-primary);
+  transform: translateY(1px);
 }
 
 .icon-btn {
@@ -708,6 +759,43 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Custom Stream & Radio Discovery Card */
+.custom-stream-card {
+  border-style: dashed;
+  border-color: var(--border-active);
+  background: rgba(5, 150, 105, 0.03);
+}
+
+.custom-stream-card:hover {
+  border-color: var(--accent-emerald);
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.custom-stream-avatar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-stream-icon-box {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  background: var(--bg-surface-elevated);
+  border: 2px dashed var(--accent-emerald);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-emerald);
+  transition: all 0.2s ease;
+}
+
+.custom-stream-card:hover .custom-stream-icon-box {
+  background: var(--accent-emerald);
+  color: #ffffff;
+  border-style: solid;
 }
 
 /* ==========================================================================
@@ -2072,23 +2160,33 @@ body {
     width: 60px;
     height: 60px;
   }
-}
 
-@media (max-width: 380px) {
-  .header-actions {
-    gap: 5px;
+  .stream-action-btn .center-pill-text {
+    display: none;
   }
 
-  .custom-stream-btn {
-    display: none;
+  .profile-pill-label {
+    max-width: 65px;
+  }
+}
+
+@media (max-width: 420px) {
+  .brand-title {
+    font-size: 0.88rem;
   }
 
   .profile-pill-label {
     display: none;
   }
 
-  .header-profile-pill {
-    padding: 6px 8px;
+  .center-pill-btn {
+    padding: 4px 7px;
+    gap: 4px;
+  }
+
+  .navbar-center-pill {
+    padding: 2px 4px;
   }
 }
+
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Radio, Disc, User, Mail, Sun, Moon } from 'lucide-react';
+import { Radio, Disc, User, Mail, Sun, Moon, ChevronDown } from 'lucide-react';
 import type { ThemeMode } from '../services/theme';
 
 interface Props {
@@ -23,7 +23,7 @@ export const Header: React.FC<Props> = ({
 
   return (
     <header className="app-header">
-      {/* Brand Logo & Title */}
+      {/* 1. Left: Brand Logo & Title */}
       <div className="brand-logo" role="banner">
         <div className="brand-icon">
           <Disc size={19} className="animate-spin-slow" />
@@ -36,18 +36,33 @@ export const Header: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Action Cluster */}
-      <div className="header-actions">
-        {/* Unified Sync & Account Profile Pill */}
+      {/* 2. Center: Quick-Access Unified Center Pill */}
+      <div className={`navbar-center-pill ${isConfigured ? 'synced' : 'local'}`}>
+        {/* Custom Audio Stream Trigger */}
         <button
+          type="button"
+          className="center-pill-btn stream-action-btn"
+          onClick={onOpenCustomStream}
+          title="Add Custom Audio / SoundCloud Stream"
+          aria-label="Add Custom Stream"
+        >
+          <Radio size={13} className="stream-icon-accent" />
+          <span className="center-pill-text">Live Stream</span>
+        </button>
+
+        <span className="center-pill-divider" aria-hidden="true" />
+
+        {/* Sync & Account Profile Trigger */}
+        <button
+          type="button"
+          className="center-pill-btn account-action-btn"
           onClick={onOpenSettings}
-          className={`header-profile-pill ${isConfigured ? 'synced' : 'local'}`}
           title={
             isConfigured
               ? `Cloud Synced • Logged in as ${isEmail ? userId : 'Guest'}`
               : 'Local Mode • Click to connect Cloud Sync'
           }
-          aria-label="Account and Sync Status"
+          aria-label="Account and Sync Settings"
         >
           <span className="sync-pulse-indicator" />
           <span className="profile-pill-icon">
@@ -56,9 +71,12 @@ export const Header: React.FC<Props> = ({
           <span className="profile-pill-label">
             {isEmail ? userId.split('@')[0] : `Guest ${userId.substring(0, 5)}`}
           </span>
+          <ChevronDown size={11} className="center-pill-chevron" />
         </button>
+      </div>
 
-        {/* Quick Theme Toggle */}
+      {/* 3. Right: Theme Toggle */}
+      <div className="header-actions">
         <button
           className="icon-btn theme-toggle-btn"
           onClick={onToggleTheme}
@@ -67,28 +85,9 @@ export const Header: React.FC<Props> = ({
         >
           {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
-
-        {/* Custom Stream / Radio */}
-        <button
-          className="icon-btn custom-stream-btn"
-          onClick={onOpenCustomStream}
-          title="Add Custom Audio / SoundCloud Stream"
-          aria-label="Custom Stream"
-        >
-          <Radio size={16} />
-        </button>
-
-        {/* Settings Button */}
-        <button
-          className="icon-btn settings-btn"
-          onClick={onOpenSettings}
-          title="Settings & Sync"
-          aria-label="Settings"
-        >
-          <Settings size={16} />
-        </button>
       </div>
     </header>
   );
 };
+
 

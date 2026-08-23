@@ -1,15 +1,18 @@
 import React, { useState, useMemo } from 'react';
+import { Plus } from 'lucide-react';
 import type { Reciter } from '../types';
 import { RECITERS } from '../services/quranData';
 
 interface Props {
   selectedReciterId: string;
   onSelectReciter: (reciter: Reciter) => void;
+  onOpenCustomStream?: () => void;
 }
 
 export const ReciterSelector: React.FC<Props> = ({
   selectedReciterId,
-  onSelectReciter
+  onSelectReciter,
+  onOpenCustomStream
 }) => {
   const [styleFilter, setStyleFilter] = useState<string>('all');
 
@@ -97,7 +100,34 @@ export const ReciterSelector: React.FC<Props> = ({
             </div>
           );
         })}
+
+        {/* Custom Stream & SoundCloud Discovery Card */}
+        {onOpenCustomStream && (
+          <div
+            className="reciter-card custom-stream-card"
+            onClick={onOpenCustomStream}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenCustomStream();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Add custom audio stream or SoundCloud playlist"
+          >
+            <div className="reciter-avatar-wrap custom-stream-avatar-wrap">
+              <div className="custom-stream-icon-box">
+                <Plus size={22} />
+              </div>
+            </div>
+            <div className="reciter-name">Custom Stream</div>
+            <div className="reciter-arabic arabic-text">بث مخصص</div>
+            <div className="reciter-style">SoundCloud / MP3</div>
+          </div>
+        )}
       </div>
     </section>
   );
 };
+
