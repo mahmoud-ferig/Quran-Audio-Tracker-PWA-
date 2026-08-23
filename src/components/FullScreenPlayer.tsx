@@ -14,10 +14,10 @@ import {
   VolumeX, 
   Moon, 
   Star, 
-  Loader2,
-  Share2,
-  Download,
-  CheckCircle2
+  Loader2, 
+  Share2, 
+  Download, 
+  CheckCircle2 
 } from 'lucide-react';
 import type { Track, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
 import { isTrackDownloaded, downloadTrackForOffline, deleteDownloadedTrack } from '../services/offlineStorage';
@@ -91,6 +91,10 @@ export const FullScreenPlayer: React.FC<Props> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const sleepPopoverRef = useRef<HTMLDivElement>(null);
 
+  // Swipe gesture tracking refs
+  const touchStartY = useRef<number>(0);
+  const touchCurrentY = useRef<number>(0);
+
   // Detect touch device (mobile) — volume is a no-op on iOS/Android
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
@@ -102,7 +106,6 @@ export const FullScreenPlayer: React.FC<Props> = ({
         setIsSleepMenuOpen(false);
       }
     };
-    // Delay to avoid immediately closing from the same click
     const timer = setTimeout(() => {
       document.addEventListener('click', handleClickOutside, true);
     }, 10);
@@ -111,6 +114,18 @@ export const FullScreenPlayer: React.FC<Props> = ({
       document.removeEventListener('click', handleClickOutside, true);
     };
   }, [isSleepMenuOpen]);
+
+  // Escape key to dismiss fullscreen sheet
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Check offline status on track change
   useEffect(() => {
@@ -123,6 +138,24 @@ export const FullScreenPlayer: React.FC<Props> = ({
       isMounted = false;
     };
   }, [track]);
+
+  // Touch handlers for swipe down to dismiss
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchCurrentY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchCurrentY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    const deltaY = touchCurrentY.current - touchStartY.current;
+    // If pulled downward by more than 70px, close the player sheet
+    if (deltaY > 70) {
+      onClose();
+    }
+  };
 
   if (!isOpen || !track) return null;
 
@@ -174,14 +207,30 @@ export const FullScreenPlayer: React.FC<Props> = ({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="fullscreen-player-overlay">
-      <div className="fullscreen-player-content">
+    <div 
+      className="fullscreen-player-overlay" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Now Playing Full Screen"
+    >
+      <div 
+        className="fullscreen-player-content"
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Top Sheet Drag Handle Pill */}
+        <div className="sheet-drag-handle" onClick={onClose} title="Swipe or tap down to collapse" />
+
         {/* Top Navigation Bar */}
         <div className="fullscreen-header">
           <button 
             className="fullscreen-collapse-btn" 
             onClick={onClose}
             aria-label="Collapse Player"
+            title="Collapse Player (Esc)"
           >
             <ChevronDown size={28} />
           </button>
@@ -191,7 +240,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
             <span className="header-reciter-name">{track.reciterName}</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="fullscreen-header-actions">
             <button 
               className={`icon-btn ${isDownloaded ? 'active-downloaded' : ''}`}
               onClick={handleToggleDownload}
@@ -210,7 +259,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
               onClick={onToggleFavorite}
               title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
             >
-              <Star size={20} fill={isFavorite ? 'var(--accent-gold)' : 'none'} color={isFavorite ? 'var(--accent-gold)' : 'currentColor'} />
+              <Star size={18} fill={isFavorite ? 'var(--accent-gold)' : 'none'} color={isFavorite ? 'var(--accent-gold)' : 'currentColor'} />
             </button>
             <button 
               className="icon-btn"
@@ -234,11 +283,11 @@ export const FullScreenPlayer: React.FC<Props> = ({
           {/* Sound Waves Animation */}
           {isPlaying && (
             <div className="sound-wave-bars">
-              <span className="wave-bar bar-1"></span>
-              <span className="wave-bar bar-2"></span>
-              <span className="wave-bar bar-3"></span>
-              <span className="wave-bar bar-4"></span>
-              <span className="wave-bar bar-5"></span>
+              <span className="wave-bar bar-1" />
+              <span className="wave-bar bar-2" />
+              <span className="wave-bar bar-3" />
+              <span className="wave-bar bar-4" />
+              <span className="wave-bar bar-5" />
             </div>
           )}
         </div>
@@ -285,6 +334,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
               step={0.1}
               value={currentTime}
               onChange={(e) => onSeek(parseFloat(e.target.value))}
+              aria-label="Audio scrubber"
               style={{
                 background: `linear-gradient(to right, var(--accent-emerald) 0%, var(--accent-emerald) ${progressPercent}%, var(--border-subtle) ${progressPercent}%, var(--border-subtle) 100%)`
               }}
@@ -296,40 +346,22 @@ export const FullScreenPlayer: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Hero Control Center */}
-        <div className="fullscreen-controls-center">
-          {/* Repeat */}
+        {/* Primary Playback Row (Prev, Big Play/Pause, Next) */}
+        <div className="fullscreen-controls-primary">
           <button
-            className={`hero-control-btn ${repeatMode !== 'none' ? 'active' : ''}`}
-            onClick={onToggleRepeat}
-            title={`Repeat: ${repeatMode === 'none' ? 'Off' : repeatMode === 'one' ? 'Repeat Current Surah' : 'Repeat All'}`}
-          >
-            {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
-          </button>
-
-          {/* Skip -10s */}
-          <button
-            className="hero-control-btn"
-            onClick={() => onSkip(-10)}
-            title="Rewind 10 seconds"
-          >
-            <RotateCcw size={24} />
-          </button>
-
-          {/* Previous Track */}
-          <button
-            className="hero-control-btn"
+            className="hero-control-btn hero-prev-btn"
             onClick={onPrevTrack}
             title="Previous Surah"
+            aria-label="Previous Surah"
           >
             <SkipBack size={26} />
           </button>
 
-          {/* Giant Play / Pause Button */}
           <button
             className="fullscreen-play-hero-btn"
             onClick={onTogglePlay}
             title={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isBuffering ? (
               <Loader2 size={34} className="animate-spin" />
@@ -340,43 +372,65 @@ export const FullScreenPlayer: React.FC<Props> = ({
             )}
           </button>
 
-          {/* Next Track */}
           <button
-            className="hero-control-btn"
+            className="hero-control-btn hero-next-btn"
             onClick={onNextTrack}
             title="Next Surah"
+            aria-label="Next Surah"
           >
             <SkipForward size={26} />
           </button>
+        </div>
 
-          {/* Skip +10s */}
+        {/* Secondary Utility Controls Row (Repeat, -10s, +10s, Speed) */}
+        <div className="fullscreen-controls-secondary">
+          <button
+            className={`hero-control-btn ${repeatMode !== 'none' ? 'active' : ''}`}
+            onClick={onToggleRepeat}
+            title={`Repeat: ${repeatMode === 'none' ? 'Off' : repeatMode === 'one' ? 'Repeat Current Surah' : 'Repeat All'}`}
+            aria-label="Toggle Repeat"
+          >
+            {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+          </button>
+
+          <button
+            className="hero-control-btn"
+            onClick={() => onSkip(-10)}
+            title="Rewind 10 seconds"
+            aria-label="Rewind 10 seconds"
+          >
+            <RotateCcw size={20} />
+          </button>
+
           <button
             className="hero-control-btn"
             onClick={() => onSkip(10)}
             title="Forward 10 seconds"
+            aria-label="Forward 10 seconds"
           >
-            <RotateCw size={24} />
+            <RotateCw size={20} />
           </button>
 
-          {/* Speed Badge */}
           <button
             className="hero-control-btn speed-toggle-pill"
             onClick={onCycleSpeed}
             title="Playback Speed"
+            aria-label="Playback Speed"
           >
             <span>{playbackSpeed}x</span>
           </button>
         </div>
 
-        {/* Bottom Utility Tool Belt */}
+        {/* Bottom Tool Belt (Sleep Timer & Desktop Volume) */}
         <div className="fullscreen-bottom-belt">
           {/* Sleep Timer */}
           <div style={{ position: 'relative' }} ref={sleepPopoverRef}>
             <button
               className={`belt-btn ${sleepTimer !== 0 ? 'active' : ''}`}
               onClick={() => setIsSleepMenuOpen(!isSleepMenuOpen)}
+              aria-label="Sleep Timer Options"
             >
-              <Moon size={18} />
+              <Moon size={16} />
               <span>
                 {sleepRemainingSeconds !== null
                   ? `${Math.ceil(sleepRemainingSeconds / 60)}m`
@@ -409,7 +463,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
           {/* Volume Control — hidden on mobile touch devices where volume API is a no-op */}
           {!isTouchDevice && (
             <div className="fullscreen-volume-control">
-              <button className="icon-btn-minimal" onClick={onToggleMute}>
+              <button className="icon-btn-minimal" onClick={onToggleMute} aria-label={isMuted ? 'Unmute' : 'Mute'}>
                 {isMuted || volume === 0 ? (
                   <VolumeX size={18} />
                 ) : volume < 0.5 ? (
@@ -426,6 +480,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
                 value={isMuted ? 0 : volume}
                 onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
                 className="fullscreen-volume-slider"
+                aria-label="Volume Slider"
               />
             </div>
           )}

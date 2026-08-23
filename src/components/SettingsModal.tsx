@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, Cloud, Music, Trash2, ExternalLink, Mail, UserCheck, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Copy, Check, Cloud, Music, Trash2, ExternalLink, Mail, UserCheck, LogOut, Sun, Moon } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
 import { 
   getCustomFirebaseConfigOnly, 
@@ -42,6 +42,18 @@ export const SettingsModal: React.FC<Props> = ({
 
   const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getCustomFirebaseConfigOnly());
   const [isCustomConfig, setIsCustomConfig] = useState(() => hasCustomFirebaseConfig());
+
+  // Dismiss on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -123,20 +135,25 @@ export const SettingsModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+    >
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">Account & Settings</div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close modal">
+          <div className="modal-title" id="settings-modal-title">Account & Settings</div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close modal" title="Close (Esc)">
             <X size={18} />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
+        <div className="settings-tabs-header">
           <button
             className={`control-btn ${activeTab === 'account' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setActiveTab('account')}
           >
             <Mail size={14} style={{ marginRight: 6 }} />
@@ -145,7 +162,6 @@ export const SettingsModal: React.FC<Props> = ({
 
           <button
             className={`control-btn ${activeTab === 'firebase' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setActiveTab('firebase')}
           >
             <Cloud size={14} style={{ marginRight: 6 }} />
@@ -154,7 +170,6 @@ export const SettingsModal: React.FC<Props> = ({
 
           <button
             className={`control-btn ${activeTab === 'soundcloud' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setActiveTab('soundcloud')}
           >
             <Music size={14} style={{ marginRight: 6 }} />
@@ -165,24 +180,14 @@ export const SettingsModal: React.FC<Props> = ({
         {/* Account / Email Sync Tab */}
         {activeTab === 'account' && (
           <form onSubmit={handleLinkEmail}>
-            <div style={{
-              background: isEmailLinked ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${isEmailLinked ? 'rgba(16, 185, 129, 0.25)' : 'var(--border-subtle)'}`,
-              borderRadius: '10px',
-              padding: '12px 14px',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className={`settings-account-status ${isEmailLinked ? 'linked' : 'unlinked'}`}>
+              <div className="settings-account-info">
                 {isEmailLinked ? <UserCheck size={18} color="var(--accent-emerald)" /> : <Mail size={18} color="var(--text-muted)" />}
                 <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <div className="settings-account-title">
                     {isEmailLinked ? 'Email Profile Linked' : 'Guest Profile (Unlinked)'}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  <div className="settings-account-sub">
                     {isEmailLinked ? `Account: ${userId}` : `Temporary ID: ${userId.substring(0, 12)}...`}
                   </div>
                 </div>
@@ -192,22 +197,21 @@ export const SettingsModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="icon-btn"
+                  className="icon-btn signout-btn"
                   title="Sign Out / Switch Profile"
-                  style={{ color: '#ef4444' }}
                 >
                   <LogOut size={16} />
                 </button>
               )}
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+            <p className="settings-desc">
               Link your email address to sync your listening position, favorite Surahs, and tracker seamlessly across your phone, tablet, and laptop.
             </p>
 
             <div className="form-group">
               <label className="form-label">Your Email Address</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="settings-email-row">
                 <input
                   type="email"
                   required
@@ -219,10 +223,9 @@ export const SettingsModal: React.FC<Props> = ({
                 {isEmailLinked && (
                   <button
                     type="button"
-                    className="icon-btn"
+                    className="icon-btn copy-btn"
                     onClick={handleCopyUserId}
                     title="Copy Email"
-                    style={{ height: '42px', width: '42px', flexShrink: 0 }}
                   >
                     {copied ? <Check size={18} color="var(--accent-emerald)" /> : <Copy size={18} />}
                   </button>
@@ -231,53 +234,38 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             {/* Appearance / Theme Row */}
-            <div style={{
-              background: 'var(--bg-surface-elevated)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: '10px',
-              padding: '12px 14px',
-              marginTop: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="settings-appearance-card">
+              <div className="settings-theme-row">
                 <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    App Theme
-                  </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  <div className="settings-item-title">App Theme</div>
+                  <div className="settings-item-sub">
                     {theme === 'light' ? 'Light Theme (Default)' : 'Dark Theme'}
                   </div>
                 </div>
 
                 <button
                   type="button"
-                  className="control-btn"
+                  className="control-btn theme-switch-btn"
                   onClick={onToggleTheme}
-                  style={{
-                    width: 'auto',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
                 >
-                  {theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'}
+                  {theme === 'light' ? (
+                    <>
+                      <Moon size={14} style={{ marginRight: 6 }} /> Switch to Dark
+                    </>
+                  ) : (
+                    <>
+                      <Sun size={14} style={{ marginRight: 6 }} /> Switch to Light
+                    </>
+                  )}
                 </button>
               </div>
 
               {/* Accent Color Palette */}
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              <div className="settings-accent-row">
+                <div className="settings-accent-label">
                   Accent Color (لون التمييز)
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div className="settings-accent-list">
                   {[
                     { id: 'emerald', label: 'Emerald Oasis', color: '#059669' },
                     { id: 'gold', label: 'Royal Gold', color: '#d97706' },
@@ -289,22 +277,10 @@ export const SettingsModal: React.FC<Props> = ({
                       type="button"
                       onClick={() => onChangeAccent(acc.id as AccentColor)}
                       className={`filter-chip ${accent === acc.id ? 'active' : ''}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.75rem',
-                        padding: '4px 10px'
-                      }}
                     >
                       <span 
-                        style={{ 
-                          width: '10px', 
-                          height: '10px', 
-                          borderRadius: '50%', 
-                          background: acc.color,
-                          display: 'inline-block' 
-                        }} 
+                        className="accent-circle-preview"
+                        style={{ background: acc.color }} 
                       />
                       {acc.label}
                     </button>
@@ -313,11 +289,10 @@ export const SettingsModal: React.FC<Props> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <div className="settings-actions-row">
               <button 
                 type="submit" 
                 className="primary-btn" 
-                style={{ flex: 1 }}
                 disabled={isMigrating}
               >
                 {isMigrating ? 'Syncing...' : (isEmailLinked ? 'Update Account Email' : 'Link & Sync Email')}
@@ -326,9 +301,8 @@ export const SettingsModal: React.FC<Props> = ({
               {isEmailLinked && (
                 <button
                   type="button"
-                  className="control-btn"
+                  className="control-btn signout-text-btn"
                   onClick={handleSignOut}
-                  style={{ width: 'auto', padding: '0 14px', fontSize: '0.8rem', color: '#ef4444' }}
                 >
                   Sign Out
                 </button>
@@ -340,24 +314,14 @@ export const SettingsModal: React.FC<Props> = ({
         {/* Firebase Config Tab */}
         {activeTab === 'firebase' && (
           <form onSubmit={handleSaveFirebase}>
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '10px',
-              padding: '12px 14px',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="settings-db-status">
+              <div className="settings-account-info">
                 <Check size={18} color="var(--accent-emerald)" />
                 <div>
-                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <div className="settings-account-title">
                     {isCustomConfig ? 'Custom Database Connected' : 'Cloud Firestore Active'}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  <div className="settings-account-sub">
                     {isCustomConfig ? `Custom Project: ${fbConfig.projectId}` : 'Default Cloud Sync is active under the hood for all users.'}
                   </div>
                 </div>
@@ -367,16 +331,15 @@ export const SettingsModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleClearFirebase}
-                  className="icon-btn"
+                  className="icon-btn signout-btn"
                   title="Disconnect Custom Database"
-                  style={{ color: '#ef4444' }}
                 >
                   <Trash2 size={16} />
                 </button>
               )}
             </div>
 
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+            <p className="settings-desc">
               Want to route your sync to your own private Firebase project instead of the default cloud? Enter your personal credentials:
             </p>
 
@@ -413,30 +376,29 @@ export const SettingsModal: React.FC<Props> = ({
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-              <button type="submit" className="primary-btn" style={{ flex: 1 }}>
+            <div className="settings-actions-row">
+              <button type="submit" className="primary-btn">
                 Connect Custom Database
               </button>
 
               {isCustomConfig && (
                 <button
                   type="button"
-                  className="control-btn"
+                  className="control-btn signout-text-btn"
                   onClick={handleClearFirebase}
-                  style={{ width: 'auto', padding: '0 14px', fontSize: '0.8rem', color: '#ef4444' }}
                 >
                   Disconnect
                 </button>
               )}
             </div>
 
-            <div style={{ marginTop: '12px', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="settings-db-footer">
               <span>Want your own free private database?</span>
               <a
                 href="https://console.firebase.google.com"
                 target="_blank"
                 rel="noreferrer"
-                style={{ color: 'var(--accent-emerald)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                className="settings-link"
               >
                 Firebase Console <ExternalLink size={10} />
               </a>
@@ -447,7 +409,7 @@ export const SettingsModal: React.FC<Props> = ({
         {/* SoundCloud API Tab */}
         {activeTab === 'soundcloud' && (
           <form onSubmit={handleSaveSoundCloud}>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            <p className="settings-desc">
               Optionally supply a SoundCloud Client ID to resolve private playlist URLs.
             </p>
 
@@ -471,3 +433,4 @@ export const SettingsModal: React.FC<Props> = ({
     </div>
   );
 };
+

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Cloud, HardDrive, Radio, Disc, User, Mail, Sun, Moon } from 'lucide-react';
+import { Settings, Radio, Disc, User, Mail, Sun, Moon } from 'lucide-react';
 import type { ThemeMode } from '../services/theme';
 
 interface Props {
@@ -23,33 +23,42 @@ export const Header: React.FC<Props> = ({
 
   return (
     <header className="app-header">
-      <div className="brand-logo">
+      {/* Brand Logo & Title */}
+      <div className="brand-logo" role="banner">
         <div className="brand-icon">
-          <Disc size={18} className="animate-spin-slow" />
+          <Disc size={19} className="animate-spin-slow" />
         </div>
         <div className="brand-text-container">
-          <div className="brand-title">Quran Audio Tracker</div>
-          <button
-            onClick={onOpenSettings}
-            className="user-profile-btn"
-            title={isEmail ? `Logged in as ${userId}` : 'Click to link your email for multi-device sync'}
-          >
-            {isEmail ? <Mail size={10} /> : <User size={10} />}
-            <span className="user-email-text">{isEmail ? userId : `Guest (${userId.substring(0, 8)})`}</span>
-          </button>
+          <div className="brand-title-row">
+            <span className="brand-title">Quran Tracker</span>
+            <span className="brand-arabic-subtitle arabic-text">القرآن الكريم</span>
+          </div>
         </div>
       </div>
 
+      {/* Action Cluster */}
       <div className="header-actions">
-        <div 
-          className={`badge-status ${isConfigured ? '' : 'offline'}`}
-          title={isConfigured ? 'Connected to Firebase Firestore' : 'Running in Offline Local Storage mode'}
+        {/* Unified Sync & Account Profile Pill */}
+        <button
+          onClick={onOpenSettings}
+          className={`header-profile-pill ${isConfigured ? 'synced' : 'local'}`}
+          title={
+            isConfigured
+              ? `Cloud Synced • Logged in as ${isEmail ? userId : 'Guest'}`
+              : 'Local Mode • Click to connect Cloud Sync'
+          }
+          aria-label="Account and Sync Status"
         >
-          {isConfigured ? <Cloud size={13} /> : <HardDrive size={13} />}
-          <span className="badge-text">{isConfigured ? 'Synced' : 'Local'}</span>
-        </div>
+          <span className="sync-pulse-indicator" />
+          <span className="profile-pill-icon">
+            {isEmail ? <Mail size={12} /> : <User size={12} />}
+          </span>
+          <span className="profile-pill-label">
+            {isEmail ? userId.split('@')[0] : `Guest ${userId.substring(0, 5)}`}
+          </span>
+        </button>
 
-        {/* Theme Toggle Button */}
+        {/* Quick Theme Toggle */}
         <button
           className="icon-btn theme-toggle-btn"
           onClick={onToggleTheme}
@@ -59,17 +68,19 @@ export const Header: React.FC<Props> = ({
           {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
+        {/* Custom Stream / Radio */}
         <button
-          className="icon-btn"
+          className="icon-btn custom-stream-btn"
           onClick={onOpenCustomStream}
-          title="Add SoundCloud / Custom Stream"
-          aria-label="Add SoundCloud or Custom Stream"
+          title="Add Custom Audio / SoundCloud Stream"
+          aria-label="Custom Stream"
         >
           <Radio size={16} />
         </button>
 
+        {/* Settings Button */}
         <button
-          className="icon-btn"
+          className="icon-btn settings-btn"
           onClick={onOpenSettings}
           title="Settings & Sync"
           aria-label="Settings"
@@ -80,3 +91,4 @@ export const Header: React.FC<Props> = ({
     </header>
   );
 };
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Radio, Music, Plus } from 'lucide-react';
 import type { Track } from '../types';
 import { createCustomTrack, fetchPlaylistTracks } from '../services/soundcloud';
@@ -21,6 +21,18 @@ export const CustomStreamModal: React.FC<Props> = ({
   const [playlistId, setPlaylistId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Dismiss on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -66,20 +78,25 @@ export const CustomStreamModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="custom-stream-modal-title"
+    >
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">Custom Audio Stream</div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close modal">
+          <div className="modal-title" id="custom-stream-modal-title">Custom Audio Stream</div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close modal" title="Close (Esc)">
             <X size={18} />
           </button>
         </div>
 
         {/* Mode Selector */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <div className="settings-tabs-header">
           <button
             className={`control-btn ${streamType === 'custom' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 14px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setStreamType('custom')}
           >
             <Radio size={14} style={{ marginRight: 6 }} />
@@ -88,7 +105,6 @@ export const CustomStreamModal: React.FC<Props> = ({
 
           <button
             className={`control-btn ${streamType === 'soundcloud' ? 'active' : ''}`}
-            style={{ width: 'auto', padding: '6px 14px', fontSize: '0.82rem', fontWeight: 600 }}
             onClick={() => setStreamType('soundcloud')}
           >
             <Music size={14} style={{ marginRight: 6 }} />
@@ -97,7 +113,7 @@ export const CustomStreamModal: React.FC<Props> = ({
         </div>
 
         {errorMsg && (
-          <div style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '10px 14px', borderRadius: '10px', fontSize: '0.82rem', marginBottom: '16px' }}>
+          <div className="form-error-alert">
             {errorMsg}
           </div>
         )}
@@ -146,7 +162,7 @@ export const CustomStreamModal: React.FC<Props> = ({
           </form>
         ) : (
           <form onSubmit={handleFetchSoundCloud}>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            <p className="settings-desc">
               Import a playlist directly from SoundCloud using its Playlist ID. Make sure your SoundCloud Client ID is configured in Settings.
             </p>
 
@@ -171,3 +187,4 @@ export const CustomStreamModal: React.FC<Props> = ({
     </div>
   );
 };
+

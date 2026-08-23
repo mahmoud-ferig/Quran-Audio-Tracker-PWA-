@@ -66,8 +66,15 @@ export const ReciterSelector: React.FC<Props> = ({
               key={reciter.id}
               className={`reciter-card ${isActive ? 'active' : ''}`}
               onClick={() => onSelectReciter(reciter)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectReciter(reciter);
+                }
+              }}
               role="button"
               tabIndex={0}
+              aria-label={`Select reciter ${reciter.name}`}
             >
               <div className="reciter-avatar-wrap">
                 <img

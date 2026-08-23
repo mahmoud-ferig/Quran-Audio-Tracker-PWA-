@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Star, X, Sparkles } from 'lucide-react';
 import type { Track, ListeningProgress } from '../types';
 
@@ -23,6 +23,14 @@ export const TrackList: React.FC<Props> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'favorites' | 'Meccan' | 'Medinan' | 'progress'>('all');
+  const activeCardRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll active track card into view smoothly
+  useEffect(() => {
+    if (activeTrackId && activeCardRef.current) {
+      activeCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeTrackId]);
 
   const filteredTracks = useMemo(() => {
     return tracks.filter((track) => {
@@ -139,6 +147,7 @@ export const TrackList: React.FC<Props> = ({
           return (
             <div
               key={track.id}
+              ref={isActive ? activeCardRef : null}
               className={`track-card ${isActive ? 'active' : ''}`}
               onClick={() => onSelectTrack(track)}
               role="button"
