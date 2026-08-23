@@ -173,6 +173,15 @@ body {
   50% { transform: scale(1.05); opacity: 1; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 @keyframes sound-wave-bounce {
   0%, 100% { height: 4px; }
   50% { height: 16px; }
@@ -275,6 +284,32 @@ body {
   background: var(--bg-card-hover);
   color: var(--text-primary);
   border-color: var(--border-active);
+}
+
+/* Control button used in modal tab navigation */
+.control-btn {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+.control-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.control-btn.active {
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--accent-emerald);
+  border-color: var(--accent-emerald);
 }
 
 .badge-status {
@@ -1147,12 +1182,15 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: 20px 24px 32px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 20px;
   max-height: 94vh;
+  max-height: 94dvh;
   overflow-y: auto;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+  -webkit-overflow-scrolling: touch;
 }
 
 .fullscreen-header {
@@ -1456,6 +1494,8 @@ body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   z-index: 110;
   min-width: 140px;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .popover-title {

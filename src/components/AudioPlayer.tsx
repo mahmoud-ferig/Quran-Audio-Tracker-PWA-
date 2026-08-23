@@ -56,6 +56,8 @@ export const AudioPlayer: React.FC<Props> = ({
   const [sleepRemainingSeconds, setSleepRemainingSeconds] = useState<number | null>(null);
 
   const lastSavedTimeRef = useRef<number>(0);
+  const lastPositionUpdateRef = useRef<number>(0);
+  const userInitiatedPlayRef = useRef<boolean>(false);
 
   // References to keep mediaSession callbacks fully stable
   const onNextTrackRef = useRef(onNextTrack);
@@ -152,6 +154,9 @@ export const AudioPlayer: React.FC<Props> = ({
   const handleTogglePlay = useCallback(() => {
     if (!audioRef.current) return;
 
+    // Mark as user-initiated so the useEffect doesn't fight with the audio events
+    userInitiatedPlayRef.current = true;
+
     if (isPlaying) {
       audioRef.current.pause();
       onPlayStateChange(false);
@@ -233,8 +238,14 @@ export const AudioPlayer: React.FC<Props> = ({
   };
 
   // Play / Pause side-effect sync from React props
+  // Only act on user-initiated changes to avoid ping-pong with audio element events
   useEffect(() => {
     if (!audioRef.current || !track) return;
+    if (!userInitiatedPlayRef.current) {
+      // This change came from audio element events (onPause/onPlaying), skip to avoid loop
+      return;
+    }
+    userInitiatedPlayRef.current = false;
     if (isPlaying) {
       audioRef.current.play().catch(() => {
         onPlayStateChange(false);
@@ -306,12 +317,23 @@ export const AudioPlayer: React.FC<Props> = ({
       });
 
       navigator.mediaSession.setActionHandler('play', () => {
-        audioRef.current?.play().catch(() => {});
+        audioRef.current?.play().then(() => {
+          onPlayStateChangeRef.current(true);
+        }).catch(() => {});
       });
 
       navigator.mediaSession.setActionHandler('pause', () => {
         audioRef.current?.pause();
+        onPlayStateChangeRef.current(false);
       });
+
+      // Android / Bluetooth 'stop' action
+      try {
+        navigator.mediaSession.setActionHandler('stop', () => {
+          audioRef.current?.pause();
+          onPlayStateChangeRef.current(false);
+        });
+      } catch {}
 
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         onPrevTrackRef.current();
@@ -351,18 +373,22 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [track]);
 
-  // Sync position state with system lock screen scrubber
+  // Sync position state with system lock screen scrubber — throttled to ~1/sec
   useEffect(() => {
-    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && duration > 0 && !isNaN(duration)) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: Math.max(0, duration),
-          playbackRate: playbackSpeed || 1.0,
-          position: Math.max(0, Math.min(currentTime, duration))
-        });
-      } catch {
-        // Ignore minor rounding sync errors
-      }
+    if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession) || duration <= 0 || isNaN(duration)) {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastPositionUpdateRef.current < 1000) return;
+    lastPositionUpdateRef.current = now;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: Math.max(0, duration),
+        playbackRate: playbackSpeed || 1.0,
+        position: Math.max(0, Math.min(currentTime, duration))
+      });
+    } catch {
+      // Ignore minor rounding sync errors
     }
   }, [currentTime, duration, playbackSpeed]);
 
@@ -439,7 +465,6 @@ export const AudioPlayer: React.FC<Props> = ({
         src={track.stream_url}
         preload="metadata"
         playsInline={true}
-        crossOrigin="anonymous"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onWaiting={() => setIsBuffering(true)}

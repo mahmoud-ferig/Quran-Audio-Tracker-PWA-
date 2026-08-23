@@ -154,23 +154,34 @@ export const App: React.FC = () => {
   };
 
   // 5. Handle Next / Prev Track
+  // Inline the track selection logic to avoid stale closure over handleSelectTrack
   const handleNextTrack = useCallback(() => {
     if (!activeTrack) return;
     const currentIndex = tracks.findIndex(t => t.id === activeTrack.id);
+    let nextTrack: Track | null = null;
     if (currentIndex >= 0 && currentIndex < tracks.length - 1) {
-      handleSelectTrack(tracks[currentIndex + 1]);
+      nextTrack = tracks[currentIndex + 1];
     } else if (tracks.length > 0) {
-      handleSelectTrack(tracks[0]);
+      nextTrack = tracks[0]; // Wrap around
+    }
+    if (nextTrack) {
+      setActiveTrack(nextTrack);
+      setIsPlaying(true);
     }
   }, [activeTrack, tracks]);
 
   const handlePrevTrack = useCallback(() => {
     if (!activeTrack) return;
     const currentIndex = tracks.findIndex(t => t.id === activeTrack.id);
+    let prevTrack: Track | null = null;
     if (currentIndex > 0) {
-      handleSelectTrack(tracks[currentIndex - 1]);
+      prevTrack = tracks[currentIndex - 1];
     } else if (tracks.length > 0) {
-      handleSelectTrack(tracks[tracks.length - 1]);
+      prevTrack = tracks[tracks.length - 1]; // Wrap around
+    }
+    if (prevTrack) {
+      setActiveTrack(prevTrack);
+      setIsPlaying(true);
     }
   }, [activeTrack, tracks]);
 

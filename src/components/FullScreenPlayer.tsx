@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronDown, 
   Play, 
@@ -89,6 +89,28 @@ export const FullScreenPlayer: React.FC<Props> = ({
   const [isSleepMenuOpen, setIsSleepMenuOpen] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const sleepPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Detect touch device (mobile) — volume is a no-op on iOS/Android
+  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+  // Click-outside-to-close for sleep timer popover
+  useEffect(() => {
+    if (!isSleepMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sleepPopoverRef.current && !sleepPopoverRef.current.contains(e.target as Node)) {
+        setIsSleepMenuOpen(false);
+      }
+    };
+    // Delay to avoid immediately closing from the same click
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside, true);
+    }, 10);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside, true);
+    };
+  }, [isSleepMenuOpen]);
 
   // Check offline status on track change
   useEffect(() => {
@@ -349,7 +371,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
         {/* Bottom Utility Tool Belt */}
         <div className="fullscreen-bottom-belt">
           {/* Sleep Timer */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} ref={sleepPopoverRef}>
             <button
               className={`belt-btn ${sleepTimer !== 0 ? 'active' : ''}`}
               onClick={() => setIsSleepMenuOpen(!isSleepMenuOpen)}
@@ -384,27 +406,29 @@ export const FullScreenPlayer: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Volume Control */}
-          <div className="fullscreen-volume-control">
-            <button className="icon-btn-minimal" onClick={onToggleMute}>
-              {isMuted || volume === 0 ? (
-                <VolumeX size={18} />
-              ) : volume < 0.5 ? (
-                <Volume1 size={18} />
-              ) : (
-                <Volume2 size={18} />
-              )}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-              className="fullscreen-volume-slider"
-            />
-          </div>
+          {/* Volume Control — hidden on mobile touch devices where volume API is a no-op */}
+          {!isTouchDevice && (
+            <div className="fullscreen-volume-control">
+              <button className="icon-btn-minimal" onClick={onToggleMute}>
+                {isMuted || volume === 0 ? (
+                  <VolumeX size={18} />
+                ) : volume < 0.5 ? (
+                  <Volume1 size={18} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                className="fullscreen-volume-slider"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
