@@ -20,6 +20,7 @@ import {
   CheckCircle2 
 } from 'lucide-react';
 import type { Track, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
+import { formatTime } from '../utils/formatTime';
 import { isTrackDownloaded, downloadTrackForOffline, deleteDownloadedTrack } from '../services/offlineStorage';
 
 interface Props {
@@ -179,17 +180,7 @@ export const FullScreenPlayer: React.FC<Props> = ({
     }
   };
 
-  const formatTime = (timeInSec: number) => {
-    if (!timeInSec || isNaN(timeInSec)) return '0:00';
-    const h = Math.floor(timeInSec / 3600);
-    const m = Math.floor((timeInSec % 3600) / 60);
-    const s = Math.floor(timeInSec % 60);
 
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
 
   const handleShare = () => {
     if (navigator.share) {

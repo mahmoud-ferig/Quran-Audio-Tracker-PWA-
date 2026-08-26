@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
 import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting } from '../services/storage';
+import { formatTime } from '../utils/formatTime';
 import { FullScreenPlayer } from './FullScreenPlayer';
 
 interface Props {
@@ -57,37 +58,25 @@ export const AudioPlayer: React.FC<Props> = ({
 
   const lastSavedTimeRef = useRef<number>(0);
   const lastPositionUpdateRef = useRef<number>(0);
-  const userInitiatedPlayRef = useRef<boolean>(false);
+  // Tracks the track ID we already loaded, to detect new track arrivals
+  const loadedTrackIdRef = useRef<string | null>(null);
+  // Whether we intend to play after loading a new track
+  const playIntentRef = useRef<boolean>(false);
 
-  // References to keep mediaSession callbacks fully stable
+  // Stable refs for callbacks used inside MediaSession and audio events
   const onNextTrackRef = useRef(onNextTrack);
   const onPrevTrackRef = useRef(onPrevTrack);
   const onPlayStateChangeRef = useRef(onPlayStateChange);
-  const isPlayingRef = useRef(isPlaying);
   const trackRef = useRef(track);
 
   useEffect(() => {
     onNextTrackRef.current = onNextTrack;
     onPrevTrackRef.current = onPrevTrack;
     onPlayStateChangeRef.current = onPlayStateChange;
-    isPlayingRef.current = isPlaying;
     trackRef.current = track;
   });
 
-  // Helper to format mm:ss or hh:mm:ss
-  const formatTime = (timeInSec: number) => {
-    if (!timeInSec || isNaN(timeInSec)) return '0:00';
-    const h = Math.floor(timeInSec / 3600);
-    const m = Math.floor((timeInSec % 3600) / 60);
-    const s = Math.floor(timeInSec % 60);
-
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // Efficient Save Progress Function
+  // ── Persist Progress ─────────────────────────────────────────────────
   const persistProgress = useCallback(
     async (overrideTime?: number, isFinished = false) => {
       if (!track) return;
@@ -127,52 +116,113 @@ export const AudioPlayer: React.FC<Props> = ({
     [track, duration, userId, onProgressUpdated]
   );
 
+  // Keep a ref so audio event handlers always get the latest persistProgress
   const persistProgressRef = useRef(persistProgress);
   useEffect(() => {
     persistProgressRef.current = persistProgress;
   }, [persistProgress]);
 
-  const handleTimeUpdate = () => {
+  // ── Audio Element Event Handlers ──────────────────────────────────────
+  // These fire from the browser's native <audio> element.
+  // They are the ONLY place we call onPlayStateChange to update the parent.
+  // We never sync isPlaying → audio.play()/pause() through a useEffect.
+
+  const handleTimeUpdate = useCallback(() => {
     if (!audioRef.current) return;
     const now = audioRef.current.currentTime;
     setCurrentTime(now);
 
     // Save every 5s of active playback delta
     if (Math.abs(now - lastSavedTimeRef.current) >= 5) {
-      persistProgress(now);
+      persistProgressRef.current(now);
     }
-  };
+  }, []);
 
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = useCallback(() => {
     if (!audioRef.current) return;
     const dur = audioRef.current.duration;
     if (dur && !isNaN(dur)) {
       setDuration(dur);
     }
-  };
+  }, []);
+
+  const handleWaiting = useCallback(() => {
+    setIsBuffering(true);
+  }, []);
+
+  const handlePlaying = useCallback(() => {
+    setIsBuffering(false);
+    onPlayStateChangeRef.current(true);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
+  }, []);
+
+  const handleCanPlay = useCallback(() => {
+    setIsBuffering(false);
+    // If we had a play intent (e.g. new track loaded while isPlaying was true),
+    // start playback now that the audio is ready.
+    if (playIntentRef.current && audioRef.current?.paused) {
+      audioRef.current.play().catch(() => {
+        onPlayStateChangeRef.current(false);
+      });
+      playIntentRef.current = false;
+    }
+  }, []);
+
+  const handlePause = useCallback(() => {
+    // Don't propagate pause if we're just loading a new track (the browser pauses
+    // the old src before loading the new one).
+    if (playIntentRef.current) return;
+    onPlayStateChangeRef.current(false);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'paused';
+    }
+    persistProgressRef.current();
+  }, []);
+
+  const handleTrackEnded = useCallback(() => {
+    persistProgressRef.current(undefined, true);
+
+    if (sleepTimer === 'surah') {
+      onPlayStateChangeRef.current(false);
+      setSleepTimer(0);
+      setSleepRemainingSeconds(null);
+      return;
+    }
+
+    if (repeatMode === 'one') {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
+      }
+    } else if (repeatMode === 'all' || autoplayNext) {
+      onNextTrackRef.current();
+    } else {
+      onPlayStateChangeRef.current(false);
+    }
+  }, [sleepTimer, repeatMode, autoplayNext]);
+
+  // ── User Actions ──────────────────────────────────────────────────────
 
   const handleTogglePlay = useCallback(() => {
     if (!audioRef.current) return;
 
-    // Mark as user-initiated so the useEffect doesn't fight with the audio events
-    userInitiatedPlayRef.current = true;
-
     if (isPlaying) {
       audioRef.current.pause();
-      onPlayStateChange(false);
-      persistProgress();
+      // onPause handler will call onPlayStateChange(false)
     } else {
       audioRef.current
         .play()
         .then(() => {
-          onPlayStateChange(true);
+          // onPlaying handler will call onPlayStateChange(true)
         })
         .catch((e) => {
           console.error('Play error:', e);
           onPlayStateChange(false);
         });
     }
-  }, [isPlaying, persistProgress, onPlayStateChange]);
+  }, [isPlaying, onPlayStateChange]);
 
   const handleSeek = useCallback((time: number) => {
     setCurrentTime(time);
@@ -186,10 +236,10 @@ export const AudioPlayer: React.FC<Props> = ({
     const newTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
-    persistProgress(newTime);
-  }, [duration, persistProgress]);
+    persistProgressRef.current(newTime);
+  }, [duration]);
 
-  const cycleSpeed = () => {
+  const cycleSpeed = useCallback(() => {
     const currentIndex = SPEED_OPTIONS.indexOf(playbackSpeed);
     const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
     const newSpeed = SPEED_OPTIONS[nextIndex];
@@ -197,13 +247,15 @@ export const AudioPlayer: React.FC<Props> = ({
     if (audioRef.current) {
       audioRef.current.playbackRate = newSpeed;
     }
-  };
+  }, [playbackSpeed]);
 
-  const toggleRepeat = () => {
-    if (repeatMode === 'none') setRepeatMode('one');
-    else if (repeatMode === 'one') setRepeatMode('all');
-    else setRepeatMode('none');
-  };
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode(prev => {
+      if (prev === 'none') return 'one';
+      if (prev === 'one') return 'all';
+      return 'none';
+    });
+  }, []);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
@@ -215,47 +267,45 @@ export const AudioPlayer: React.FC<Props> = ({
     });
   }, []);
 
-  const handleTrackEnded = () => {
-    persistProgress(duration, true);
-
-    if (sleepTimer === 'surah') {
-      onPlayStateChange(false);
-      setSleepTimer(0);
-      setSleepRemainingSeconds(null);
-      return;
-    }
-
-    if (repeatMode === 'one') {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
-      }
-    } else if (repeatMode === 'all' || autoplayNext) {
-      onNextTrack();
-    } else {
-      onPlayStateChange(false);
-    }
-  };
-
-  // Play / Pause side-effect sync from React props
-  // Only act on user-initiated changes to avoid ping-pong with audio element events
+  // ── Track Change Effect ───────────────────────────────────────────────
+  // When a new track arrives, load it and optionally start playback.
+  // This is the ONLY effect that controls the audio element's src.
   useEffect(() => {
-    if (!audioRef.current || !track) return;
-    if (!userInitiatedPlayRef.current) {
-      // This change came from audio element events (onPause/onPlaying), skip to avoid loop
-      return;
-    }
-    userInitiatedPlayRef.current = false;
-    if (isPlaying) {
-      audioRef.current.play().catch(() => {
-        onPlayStateChange(false);
-      });
-    } else {
-      audioRef.current.pause();
-    }
-  }, [track, isPlaying, onPlayStateChange]);
+    if (!track || !audioRef.current) return;
 
-  // Sleep Timer Countdown Effect
+    // Same track, nothing to do
+    if (loadedTrackIdRef.current === track.id) return;
+
+    const audio = audioRef.current;
+    loadedTrackIdRef.current = track.id;
+
+    // Reset UI state for the new track
+    setCurrentTime(0);
+    setDuration(track.duration || 0);
+    lastSavedTimeRef.current = 0;
+    setIsBuffering(true);
+
+    // Signal that we want to play after loading (if parent says isPlaying)
+    playIntentRef.current = isPlaying;
+
+    // Load the new source — the browser will fire loadedmetadata → canplay
+    audio.src = track.stream_url;
+    audio.playbackRate = playbackSpeed;
+    audio.load();
+
+    // Restore saved progress for this track
+    (async () => {
+      const saved = await getTrackProgress(userId, track.id);
+      if (saved && saved.currentTime > 0 && audioRef.current) {
+        audioRef.current.currentTime = saved.currentTime;
+        setCurrentTime(saved.currentTime);
+      }
+    })();
+  }, [track, isPlaying, playbackSpeed, userId]);
+
+  // ── Sleep Timer Countdown ─────────────────────────────────────────────
+  // Fixed: sleepRemainingSeconds is NOT in the dependency array so the
+  // interval is created once per timer activation, not recreated every second.
   useEffect(() => {
     if (typeof sleepTimer !== 'number' || sleepTimer === 0 || sleepRemainingSeconds === null) {
       return;
@@ -268,7 +318,7 @@ export const AudioPlayer: React.FC<Props> = ({
           if (audioRef.current) {
             audioRef.current.pause();
           }
-          onPlayStateChange(false);
+          onPlayStateChangeRef.current(false);
           setSleepTimer(0);
           return null;
         }
@@ -277,28 +327,10 @@ export const AudioPlayer: React.FC<Props> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [sleepTimer, sleepRemainingSeconds, onPlayStateChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sleepTimer]);
 
-  // Load initial track progress
-  useEffect(() => {
-    if (!track) return;
-    let isCancelled = false;
-
-    const initTrack = async () => {
-      const saved = await getTrackProgress(userId, track.id);
-      if (!isCancelled && saved && saved.currentTime > 0 && audioRef.current) {
-        audioRef.current.currentTime = saved.currentTime;
-        setCurrentTime(saved.currentTime);
-      }
-    };
-
-    initTrack();
-    return () => {
-      isCancelled = true;
-    };
-  }, [track, userId]);
-
-  // Stable MediaSession Metadata Registration (Runs ONLY when track changes)
+  // ── MediaSession Metadata ─────────────────────────────────────────────
   useEffect(() => {
     if (!('mediaSession' in navigator) || !track) return;
 
@@ -373,7 +405,7 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [track]);
 
-  // Sync position state with system lock screen scrubber — throttled to ~1/sec
+  // ── MediaSession Position State (throttled ~1/sec) ────────────────────
   useEffect(() => {
     if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession) || duration <= 0 || isNaN(duration)) {
       return;
@@ -392,7 +424,7 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [currentTime, duration, playbackSpeed]);
 
-  // Keyboard Shortcuts
+  // ── Keyboard Shortcuts ────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
@@ -462,32 +494,14 @@ export const AudioPlayer: React.FC<Props> = ({
     <>
       <audio
         ref={audioRef}
-        src={track.stream_url}
         preload="metadata"
         playsInline={true}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => {
-          setIsBuffering(false);
-          onPlayStateChange(true);
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'playing';
-          }
-        }}
-        onCanPlay={() => {
-          setIsBuffering(false);
-          if (isPlaying && audioRef.current && audioRef.current.paused) {
-            audioRef.current.play().catch(() => {});
-          }
-        }}
-        onPause={() => {
-          onPlayStateChange(false);
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'paused';
-          }
-          persistProgress();
-        }}
+        onWaiting={handleWaiting}
+        onPlaying={handlePlaying}
+        onCanPlay={handleCanPlay}
+        onPause={handlePause}
         onEnded={handleTrackEnded}
       />
 
