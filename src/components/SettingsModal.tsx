@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Check, Cloud, Music, Trash2, ExternalLink, Mail, UserCheck, LogOut, Sun, Moon } from 'lucide-react';
+import { X, Copy, Check, Cloud, Trash2, ExternalLink, Mail, UserCheck, LogOut, Sun, Moon } from 'lucide-react';
 import type { FirebaseConfigState } from '../types';
-import { 
-  getCustomFirebaseConfigOnly, 
-  saveFirebaseConfig, 
-  clearFirebaseConfig, 
-  hasCustomFirebaseConfig 
+import {
+  getCustomFirebaseConfigOnly,
+  saveFirebaseConfig,
+  clearFirebaseConfig,
+  hasCustomFirebaseConfig
 } from '../firebase/config';
 import { setUserEmail, removeUserEmail, migrateUserData, getUserEmail } from '../services/storage';
-import { getSoundCloudClientId, setSoundCloudClientId } from '../services/soundcloud';
 import type { ThemeMode, AccentColor } from '../services/theme';
 
 interface Props {
@@ -34,10 +33,9 @@ export const SettingsModal: React.FC<Props> = ({
   accent,
   onChangeAccent
 }) => {
-  const [activeTab, setActiveTab] = useState<'account' | 'firebase' | 'soundcloud'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'firebase'>('account');
   const [copied, setCopied] = useState(false);
   const [emailInput, setEmailInput] = useState(() => getUserEmail() || (userId.includes('@') ? userId : ''));
-  const [scClientId, setScClientId] = useState(() => getSoundCloudClientId());
   const [isMigrating, setIsMigrating] = useState(false);
 
   const [fbConfig, setFbConfig] = useState<FirebaseConfigState>(() => getCustomFirebaseConfigOnly());
@@ -127,16 +125,9 @@ export const SettingsModal: React.FC<Props> = ({
     }
   };
 
-  const handleSaveSoundCloud = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSoundCloudClientId(scClientId);
-    alert('SoundCloud Client ID saved!');
-    onClose();
-  };
-
   return (
-    <div 
-      className="modal-overlay" 
+    <div
+      className="modal-overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -145,7 +136,7 @@ export const SettingsModal: React.FC<Props> = ({
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title" id="settings-modal-title">Account & Settings</div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close modal" title="Close (Esc)">
+          <button className="player-icon-btn" onClick={onClose} aria-label="Close modal" title="Close (Esc)">
             <X size={18} />
           </button>
         </div>
@@ -153,7 +144,7 @@ export const SettingsModal: React.FC<Props> = ({
         {/* Tab Navigation */}
         <div className="settings-tabs-header">
           <button
-            className={`control-btn ${activeTab === 'account' ? 'active' : ''}`}
+            className={`drawer-chip ${activeTab === 'account' ? 'active' : ''}`}
             onClick={() => setActiveTab('account')}
           >
             <Mail size={14} style={{ marginRight: 6 }} />
@@ -161,19 +152,11 @@ export const SettingsModal: React.FC<Props> = ({
           </button>
 
           <button
-            className={`control-btn ${activeTab === 'firebase' ? 'active' : ''}`}
+            className={`drawer-chip ${activeTab === 'firebase' ? 'active' : ''}`}
             onClick={() => setActiveTab('firebase')}
           >
             <Cloud size={14} style={{ marginRight: 6 }} />
             Database
-          </button>
-
-          <button
-            className={`control-btn ${activeTab === 'soundcloud' ? 'active' : ''}`}
-            onClick={() => setActiveTab('soundcloud')}
-          >
-            <Music size={14} style={{ marginRight: 6 }} />
-            SoundCloud
           </button>
         </div>
 
@@ -197,7 +180,7 @@ export const SettingsModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="icon-btn signout-btn"
+                  className="player-icon-btn"
                   title="Sign Out / Switch Profile"
                 >
                   <LogOut size={16} />
@@ -223,7 +206,7 @@ export const SettingsModal: React.FC<Props> = ({
                 {isEmailLinked && (
                   <button
                     type="button"
-                    className="icon-btn copy-btn"
+                    className="player-icon-btn"
                     onClick={handleCopyUserId}
                     title="Copy Email"
                   >
@@ -245,7 +228,7 @@ export const SettingsModal: React.FC<Props> = ({
 
                 <button
                   type="button"
-                  className="control-btn theme-switch-btn"
+                  className="drawer-chip active"
                   onClick={onToggleTheme}
                 >
                   {theme === 'light' ? (
@@ -276,11 +259,11 @@ export const SettingsModal: React.FC<Props> = ({
                       key={acc.id}
                       type="button"
                       onClick={() => onChangeAccent(acc.id as AccentColor)}
-                      className={`filter-chip ${accent === acc.id ? 'active' : ''}`}
+                      className={`drawer-chip ${accent === acc.id ? 'active' : ''}`}
                     >
-                      <span 
+                      <span
                         className="accent-circle-preview"
-                        style={{ background: acc.color }} 
+                        style={{ background: acc.color }}
                       />
                       {acc.label}
                     </button>
@@ -290,10 +273,11 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <div className="settings-actions-row">
-              <button 
-                type="submit" 
-                className="primary-btn" 
+              <button
+                type="submit"
+                className="player-browse-btn"
                 disabled={isMigrating}
+                style={{ width: '100%' }}
               >
                 {isMigrating ? 'Syncing...' : (isEmailLinked ? 'Update Account Email' : 'Link & Sync Email')}
               </button>
@@ -301,8 +285,9 @@ export const SettingsModal: React.FC<Props> = ({
               {isEmailLinked && (
                 <button
                   type="button"
-                  className="control-btn signout-text-btn"
+                  className="drawer-chip"
                   onClick={handleSignOut}
+                  style={{ marginTop: 8 }}
                 >
                   Sign Out
                 </button>
@@ -331,7 +316,7 @@ export const SettingsModal: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleClearFirebase}
-                  className="icon-btn signout-btn"
+                  className="player-icon-btn"
                   title="Disconnect Custom Database"
                 >
                   <Trash2 size={16} />
@@ -377,15 +362,16 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
 
             <div className="settings-actions-row">
-              <button type="submit" className="primary-btn">
+              <button type="submit" className="player-browse-btn" style={{ width: '100%' }}>
                 Connect Custom Database
               </button>
 
               {isCustomConfig && (
                 <button
                   type="button"
-                  className="control-btn signout-text-btn"
+                  className="drawer-chip"
                   onClick={handleClearFirebase}
+                  style={{ marginTop: 8 }}
                 >
                   Disconnect
                 </button>
@@ -405,32 +391,7 @@ export const SettingsModal: React.FC<Props> = ({
             </div>
           </form>
         )}
-
-        {/* SoundCloud API Tab */}
-        {activeTab === 'soundcloud' && (
-          <form onSubmit={handleSaveSoundCloud}>
-            <p className="settings-desc">
-              Optionally supply a SoundCloud Client ID to resolve private playlist URLs.
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">SoundCloud Client ID</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Paste your SoundCloud Client ID..."
-                value={scClientId}
-                onChange={(e) => setScClientId(e.target.value)}
-              />
-            </div>
-
-            <button type="submit" className="primary-btn">
-              Save SoundCloud Client ID
-            </button>
-          </form>
-        )}
       </div>
     </div>
   );
 };
-

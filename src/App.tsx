@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Track, Reciter, ListeningProgress, LastSession } from './types';
+import type { Track, Reciter, ListeningProgress } from './types';
 import { RECITERS, getTracksForReciter, generateTrackForSurah, SURAH_METADATA } from './services/quranData';
-import { 
-  getOrCreateUserId, 
-  getAllProgress, 
+import {
+  getOrCreateUserId,
+  getAllProgress,
   getLastSession,
   getFavorites,
   toggleFavorite,
@@ -13,26 +13,25 @@ import {
 import { initializeFirebase } from './firebase/config';
 import { getStoredTheme, getStoredAccent, applyTheme } from './services/theme';
 import type { ThemeMode, AccentColor } from './services/theme';
-import { Header } from './components/Header';
-import { ResumeBanner } from './components/ResumeBanner';
-import { ReciterSelector } from './components/ReciterSelector';
-import { TrackList } from './components/TrackList';
-import { AudioPlayer } from './components/AudioPlayer';
+import { useAudioPlayer } from './components/AudioPlayer';
+import { PlayerScreen } from './components/PlayerScreen';
+import { SurahDrawer } from './components/SurahDrawer';
 import { SettingsModal } from './components/SettingsModal';
-import { CustomStreamModal } from './components/CustomStreamModal';
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
   const [accent, setAccent] = useState<AccentColor>(() => getStoredAccent());
   const [userId, setUserId] = useState<string>(getOrCreateUserId());
-  const [isFirebaseConfigured, setIsFirebaseConfigured] = useState<boolean>(() => initializeFirebase().isConfigured);
   const [selectedReciter, setSelectedReciter] = useState<Reciter>(RECITERS[0]);
   const [tracks, setTracks] = useState<Track[]>(() => getTracksForReciter(RECITERS[0]));
-  const [activeTrack, setActiveTrack] = useState<Track | null>(() => getTracksForReciter(RECITERS[0])[0]);
+  const [activeTrack, setActiveTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [progressMap, setProgressMap] = useState<Record<string, ListeningProgress>>({});
-  const [lastSession, setLastSession] = useState<LastSession | null>(null);
   const [favorites, setFavorites] = useState<number[]>([]);
+
+  // UI State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Apply theme & accent on mount and when changed
   useEffect(() => {
@@ -50,9 +49,8 @@ export const App: React.FC = () => {
     applyTheme(theme, newAccent);
   };
 
-  // Modals
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isCustomStreamOpen, setIsCustomStreamOpen] = useState(false);
+  // Ref to AudioPlayer's autoplay intent setter
+  const setAutoplayIntentRef = React.useRef<((val: boolean) => void) | null>(null);
 
   // 1. Initial & Account Change Load + Auto-Sync on Tab Focus
   useEffect(() => {
@@ -65,7 +63,6 @@ export const App: React.FC = () => {
           getUserSettings(userId)
         ]);
         setProgressMap(prog);
-        setLastSession(session);
         setFavorites(favs);
 
         let reciterToUse = RECITERS[0];
@@ -76,12 +73,12 @@ export const App: React.FC = () => {
           const found = RECITERS.find(r => r.id === session.reciterId);
           if (found) reciterToUse = found;
         }
-        
+
         setSelectedReciter(reciterToUse);
         const reciterTracks = getTracksForReciter(reciterToUse);
         setTracks(reciterTracks);
 
-        // Always ensure an active track is loaded for the persistent player bar
+        // Restore last session track (but don't autoplay)
         if (session && session.surahNumber > 0) {
           const surah = SURAH_METADATA.find(s => s.number === session.surahNumber);
           if (surah) {
@@ -97,7 +94,6 @@ export const App: React.FC = () => {
 
     initData();
 
-    // Auto sync when user switches tabs or unlocks their phone
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         initData();
@@ -120,41 +116,28 @@ export const App: React.FC = () => {
     setTracks(newTracks);
     saveUserSettings(userId, { preferredReciterId: reciter.id });
 
-    // If currently playing a track from another reciter, switch active track to the new reciter's stream
+    // If currently playing a track, switch to same surah with new reciter
     if (activeTrack && activeTrack.surahNumber > 0) {
       const correspondingSurah = SURAH_METADATA.find(s => s.number === activeTrack.surahNumber);
       if (correspondingSurah) {
+        const wasPlaying = isPlaying;
         const updatedTrack = generateTrackForSurah(correspondingSurah, reciter);
+        if (wasPlaying) {
+          setAutoplayIntentRef.current?.(true);
+        }
         setActiveTrack(updatedTrack);
       }
     }
   };
 
-  // 3. Handle Track Selection
+  // 3. Handle Track Selection — always autoplay
   const handleSelectTrack = (track: Track) => {
+    setAutoplayIntentRef.current?.(true);
     setActiveTrack(track);
     setIsPlaying(true);
   };
 
-  // 4. Handle Resume Session
-  const handleResumeSession = (session: LastSession) => {
-    // Find matching reciter
-    const reciter = RECITERS.find(r => r.id === session.reciterId) || selectedReciter;
-    if (reciter.id !== selectedReciter.id) {
-      setSelectedReciter(reciter);
-      setTracks(getTracksForReciter(reciter));
-    }
-
-    const surah = SURAH_METADATA.find(s => s.number === session.surahNumber);
-    if (surah) {
-      const trackToPlay = generateTrackForSurah(surah, reciter);
-      setActiveTrack(trackToPlay);
-      setIsPlaying(true);
-    }
-  };
-
-  // 5. Handle Next / Prev Track
-  // Inline the track selection logic to avoid stale closure over handleSelectTrack
+  // 4. Handle Next / Prev Track
   const handleNextTrack = useCallback(() => {
     if (!activeTrack) return;
     const currentIndex = tracks.findIndex(t => t.id === activeTrack.id);
@@ -165,6 +148,7 @@ export const App: React.FC = () => {
       nextTrack = tracks[0]; // Wrap around
     }
     if (nextTrack) {
+      setAutoplayIntentRef.current?.(true);
       setActiveTrack(nextTrack);
       setIsPlaying(true);
     }
@@ -180,106 +164,101 @@ export const App: React.FC = () => {
       prevTrack = tracks[tracks.length - 1]; // Wrap around
     }
     if (prevTrack) {
+      setAutoplayIntentRef.current?.(true);
       setActiveTrack(prevTrack);
       setIsPlaying(true);
     }
   }, [activeTrack, tracks]);
 
-  // 6. Progress Update Callback
+  // 5. Progress Update Callback
   const handleProgressUpdated = useCallback((trackId: string, progress: ListeningProgress) => {
     setProgressMap(prev => ({
       ...prev,
       [trackId]: progress
     }));
+  }, []);
 
-    if (activeTrack && activeTrack.id === trackId) {
-      setLastSession({
-        trackId: activeTrack.id,
-        surahNumber: activeTrack.surahNumber,
-        reciterId: activeTrack.reciterId,
-        trackTitle: activeTrack.name,
-        arabicTitle: activeTrack.arabicName,
-        reciterName: activeTrack.reciterName,
-        currentTime: progress.currentTime,
-        duration: progress.duration,
-        updatedAt: progress.updatedAt
-      });
-    }
-  }, [activeTrack]);
-
-  // 7. Favorite Toggle
+  // 6. Favorite Toggle
   const handleToggleFavorite = async (surahNumber: number) => {
     const updated = await toggleFavorite(userId, surahNumber);
     setFavorites(updated);
   };
 
-  // 8. Add Custom Tracks / SoundCloud
-  const handleAddCustomTracks = (newTracks: Track[]) => {
-    setTracks(prev => [...newTracks, ...prev]);
-    if (newTracks.length > 0) {
-      setActiveTrack(newTracks[0]);
-    }
+  const handleFirebaseConfigUpdated = () => {
+    initializeFirebase();
+    getAllProgress(userId).then(setProgressMap);
   };
 
-  const handleFirebaseConfigUpdated = () => {
-    const { isConfigured } = initializeFirebase();
-    setIsFirebaseConfigured(isConfigured);
-  };
+  // Use audio hook — returns controls + audio element
+  const audio = useAudioPlayer({
+    track: activeTrack,
+    userId,
+    isPlaying,
+    onPlayStateChange: setIsPlaying,
+    onNextTrack: handleNextTrack,
+    onPrevTrack: handlePrevTrack,
+    onProgressUpdated: handleProgressUpdated
+  });
+
+  // Store the autoplay intent setter
+  useEffect(() => {
+    setAutoplayIntentRef.current = audio.setAutoplayIntent;
+  }, [audio.setAutoplayIntent]);
 
   return (
     <div className="app-container">
-      {/* Top Header */}
-      <Header
-        isConfigured={isFirebaseConfigured}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenCustomStream={() => setIsCustomStreamOpen(true)}
-        userId={userId}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-      />
+      {/* Hidden audio element */}
+      {audio.audioElement}
 
-      {/* Main Content Area */}
-      <main className="main-content">
-        {/* Resume Banner */}
-        <ResumeBanner
-          session={lastSession}
-          onResume={handleResumeSession}
-        />
-
-        {/* Reciters List */}
-        <ReciterSelector
-          selectedReciterId={selectedReciter.id}
-          onSelectReciter={handleSelectReciter}
-          onOpenCustomStream={() => setIsCustomStreamOpen(true)}
-        />
-
-        {/* Surahs / Tracks List */}
-        <TrackList
-          tracks={tracks}
-          activeTrackId={activeTrack?.id || null}
-          isPlaying={isPlaying}
-          progressMap={progressMap}
-          favorites={favorites}
-          onToggleFavorite={handleToggleFavorite}
-          onSelectTrack={handleSelectTrack}
-        />
-      </main>
-
-      {/* Sticky Bottom Audio Player with Full Screen Sheet */}
-      <AudioPlayer
+      {/* Full-Screen Player */}
+      <PlayerScreen
         track={activeTrack}
-        userId={userId}
         isPlaying={isPlaying}
-        onPlayStateChange={setIsPlaying}
+        isBuffering={audio.isBuffering}
+        loadError={audio.loadError}
+        currentTime={audio.currentTime}
+        duration={audio.duration}
+        playbackSpeed={audio.playbackSpeed}
+        repeatMode={audio.repeatMode}
+        sleepTimer={audio.sleepTimer}
+        sleepRemainingSeconds={audio.sleepRemainingSeconds}
+        volume={audio.volume}
+        isMuted={audio.isMuted}
         isFavorite={activeTrack ? favorites.includes(activeTrack.surahNumber) : false}
+        theme={theme}
+        onTogglePlay={audio.handleTogglePlay}
+        onSeek={audio.handleSeek}
+        onSkip={audio.handleSkip}
+        onNextTrack={handleNextTrack}
+        onPrevTrack={handlePrevTrack}
+        onCycleSpeed={audio.cycleSpeed}
+        onToggleRepeat={audio.toggleRepeat}
+        onSetSleepTimer={audio.handleSetSleepTimer}
+        onToggleMute={audio.toggleMute}
+        onVolumeChange={audio.handleVolumeChange}
         onToggleFavorite={() => {
           if (activeTrack && activeTrack.surahNumber > 0) {
             handleToggleFavorite(activeTrack.surahNumber);
           }
         }}
-        onNextTrack={handleNextTrack}
-        onPrevTrack={handlePrevTrack}
-        onProgressUpdated={handleProgressUpdated}
+        onToggleTheme={handleToggleTheme}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+      />
+
+      {/* Surah Drawer */}
+      <SurahDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        tracks={tracks}
+        activeTrackId={activeTrack?.id || null}
+        isPlaying={isPlaying}
+        progressMap={progressMap}
+        favorites={favorites}
+        selectedReciterId={selectedReciter.id}
+        onSelectReciter={handleSelectReciter}
+        onToggleFavorite={handleToggleFavorite}
+        onSelectTrack={handleSelectTrack}
       />
 
       {/* Settings Modal */}
@@ -293,13 +272,6 @@ export const App: React.FC = () => {
         onToggleTheme={handleToggleTheme}
         accent={accent}
         onChangeAccent={handleChangeAccent}
-      />
-
-      {/* Custom Stream / SoundCloud Modal */}
-      <CustomStreamModal
-        isOpen={isCustomStreamOpen}
-        onClose={() => setIsCustomStreamOpen(false)}
-        onAddTracks={handleAddCustomTracks}
       />
     </div>
   );

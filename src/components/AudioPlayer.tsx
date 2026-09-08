@@ -1,25 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { 
-  Play, 
-  Pause, 
-  SkipBack, 
-  SkipForward, 
-  Loader2,
-  ChevronUp,
-  Star
-} from 'lucide-react';
 import type { Track, ListeningProgress, PlaybackSpeed, RepeatMode, SleepTimerOption } from '../types';
 import { saveProgress, getTrackProgress, saveLastSession, getAutoplaySetting } from '../services/storage';
-import { formatTime } from '../utils/formatTime';
-import { FullScreenPlayer } from './FullScreenPlayer';
 
-interface Props {
+interface UseAudioPlayerProps {
   track: Track | null;
   userId: string;
   isPlaying: boolean;
   onPlayStateChange: (playing: boolean) => void;
-  isFavorite?: boolean;
-  onToggleFavorite?: () => void;
   onNextTrack: () => void;
   onPrevTrack: () => void;
   onProgressUpdated: (trackId: string, progress: ListeningProgress) => void;
@@ -27,17 +14,39 @@ interface Props {
 
 const SPEED_OPTIONS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
-export const AudioPlayer: React.FC<Props> = ({
+export interface AudioPlayerState {
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  isBuffering: boolean;
+  loadError: string | null;
+  currentTime: number;
+  duration: number;
+  playbackSpeed: PlaybackSpeed;
+  repeatMode: RepeatMode;
+  sleepTimer: SleepTimerOption;
+  sleepRemainingSeconds: number | null;
+  volume: number;
+  isMuted: boolean;
+  handleTogglePlay: () => void;
+  handleSeek: (time: number) => void;
+  handleSkip: (seconds: number) => void;
+  cycleSpeed: () => void;
+  toggleRepeat: () => void;
+  toggleMute: () => void;
+  handleVolumeChange: (val: number) => void;
+  handleSetSleepTimer: (val: SleepTimerOption) => void;
+  setAutoplayIntent: (val: boolean) => void;
+  audioElement: React.JSX.Element;
+}
+
+export function useAudioPlayer({
   track,
   userId,
   isPlaying,
   onPlayStateChange,
-  isFavorite = false,
-  onToggleFavorite = () => {},
   onNextTrack,
   onPrevTrack,
   onProgressUpdated
-}) => {
+}: UseAudioPlayerProps): AudioPlayerState {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isBuffering, setIsBuffering] = useState(false);
@@ -48,9 +57,7 @@ export const AudioPlayer: React.FC<Props> = ({
   const [autoplayNext] = useState<boolean>(() => getAutoplaySetting());
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState(false);
-
-  // Full Screen Sheet State
-  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Sleep Timer state
   const [sleepTimer, setSleepTimer] = useState<SleepTimerOption>(0);
@@ -58,12 +65,16 @@ export const AudioPlayer: React.FC<Props> = ({
 
   const lastSavedTimeRef = useRef<number>(0);
   const lastPositionUpdateRef = useRef<number>(0);
-  // Tracks the track ID we already loaded, to detect new track arrivals
   const loadedTrackIdRef = useRef<string | null>(null);
-  // Whether we intend to play after loading a new track
-  const playIntentRef = useRef<boolean>(false);
 
-  // Stable refs for callbacks used inside MediaSession and audio events
+  // Explicit autoplay intent — set BEFORE loading a new track
+  const autoplayIntentRef = useRef<boolean>(false);
+  // Guard against propagating pause during source swap
+  const isSwappingSourceRef = useRef<boolean>(false);
+  // Timeout for stuck loads
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stable refs for callbacks used inside audio events
   const onNextTrackRef = useRef(onNextTrack);
   const onPrevTrackRef = useRef(onPrevTrack);
   const onPlayStateChangeRef = useRef(onPlayStateChange);
@@ -116,23 +127,18 @@ export const AudioPlayer: React.FC<Props> = ({
     [track, duration, userId, onProgressUpdated]
   );
 
-  // Keep a ref so audio event handlers always get the latest persistProgress
   const persistProgressRef = useRef(persistProgress);
   useEffect(() => {
     persistProgressRef.current = persistProgress;
   }, [persistProgress]);
 
   // ── Audio Element Event Handlers ──────────────────────────────────────
-  // These fire from the browser's native <audio> element.
-  // They are the ONLY place we call onPlayStateChange to update the parent.
-  // We never sync isPlaying → audio.play()/pause() through a useEffect.
 
   const handleTimeUpdate = useCallback(() => {
     if (!audioRef.current) return;
     const now = audioRef.current.currentTime;
     setCurrentTime(now);
 
-    // Save every 5s of active playback delta
     if (Math.abs(now - lastSavedTimeRef.current) >= 5) {
       persistProgressRef.current(now);
     }
@@ -152,33 +158,58 @@ export const AudioPlayer: React.FC<Props> = ({
 
   const handlePlaying = useCallback(() => {
     setIsBuffering(false);
+    setLoadError(null);
+    isSwappingSourceRef.current = false;
     onPlayStateChangeRef.current(true);
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'playing';
+    }
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
     }
   }, []);
 
   const handleCanPlay = useCallback(() => {
     setIsBuffering(false);
-    // If we had a play intent (e.g. new track loaded while isPlaying was true),
-    // start playback now that the audio is ready.
-    if (playIntentRef.current && audioRef.current?.paused) {
+    setLoadError(null);
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    if (autoplayIntentRef.current && audioRef.current?.paused) {
       audioRef.current.play().catch(() => {
         onPlayStateChangeRef.current(false);
       });
-      playIntentRef.current = false;
+      autoplayIntentRef.current = false;
     }
   }, []);
 
   const handlePause = useCallback(() => {
-    // Don't propagate pause if we're just loading a new track (the browser pauses
-    // the old src before loading the new one).
-    if (playIntentRef.current) return;
+    if (isSwappingSourceRef.current) return;
     onPlayStateChangeRef.current(false);
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'paused';
     }
     persistProgressRef.current();
+  }, []);
+
+  const handleError = useCallback(() => {
+    setIsBuffering(false);
+    isSwappingSourceRef.current = false;
+    autoplayIntentRef.current = false;
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    const audio = audioRef.current;
+    const errorCode = audio?.error?.code;
+    let msg = 'Failed to load audio';
+    if (errorCode === 2) msg = 'Network error — check your connection';
+    else if (errorCode === 3) msg = 'Audio decoding error';
+    else if (errorCode === 4) msg = 'Audio source not found';
+    setLoadError(msg);
+    onPlayStateChangeRef.current(false);
   }, []);
 
   const handleTrackEnded = useCallback(() => {
@@ -210,13 +241,11 @@ export const AudioPlayer: React.FC<Props> = ({
 
     if (isPlaying) {
       audioRef.current.pause();
-      // onPause handler will call onPlayStateChange(false)
     } else {
+      setLoadError(null);
       audioRef.current
         .play()
-        .then(() => {
-          // onPlaying handler will call onPlayStateChange(true)
-        })
+        .then(() => {})
         .catch((e) => {
           console.error('Play error:', e);
           onPlayStateChange(false);
@@ -267,45 +296,76 @@ export const AudioPlayer: React.FC<Props> = ({
     });
   }, []);
 
+  const handleVolumeChange = useCallback((val: number) => {
+    setVolume(val);
+    if (audioRef.current) {
+      audioRef.current.volume = val;
+      audioRef.current.muted = false;
+    }
+    setIsMuted(false);
+  }, []);
+
+  const handleSetSleepTimer = useCallback((val: SleepTimerOption) => {
+    setSleepTimer(val);
+    if (typeof val === 'number' && val > 0) {
+      setSleepRemainingSeconds(val * 60);
+    } else {
+      setSleepRemainingSeconds(null);
+    }
+  }, []);
+
   // ── Track Change Effect ───────────────────────────────────────────────
-  // When a new track arrives, load it and optionally start playback.
-  // This is the ONLY effect that controls the audio element's src.
   useEffect(() => {
     if (!track || !audioRef.current) return;
 
-    // Same track, nothing to do
     if (loadedTrackIdRef.current === track.id) return;
 
     const audio = audioRef.current;
     loadedTrackIdRef.current = track.id;
 
-    // Reset UI state for the new track
     setCurrentTime(0);
     setDuration(track.duration || 0);
     lastSavedTimeRef.current = 0;
     setIsBuffering(true);
+    setLoadError(null);
 
-    // Signal that we want to play after loading (if parent says isPlaying)
-    playIntentRef.current = isPlaying;
+    isSwappingSourceRef.current = true;
 
-    // Load the new source — the browser will fire loadedmetadata → canplay
     audio.src = track.stream_url;
     audio.playbackRate = playbackSpeed;
     audio.load();
 
-    // Restore saved progress for this track
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    loadTimeoutRef.current = setTimeout(() => {
+      if (isSwappingSourceRef.current || !audioRef.current?.readyState) {
+        setIsBuffering(false);
+        isSwappingSourceRef.current = false;
+        setLoadError('Audio is taking too long to load. Check your connection.');
+      }
+    }, 20000);
+
     (async () => {
-      const saved = await getTrackProgress(userId, track.id);
-      if (saved && saved.currentTime > 0 && audioRef.current) {
-        audioRef.current.currentTime = saved.currentTime;
-        setCurrentTime(saved.currentTime);
+      try {
+        const saved = await getTrackProgress(userId, track.id);
+        if (saved && saved.currentTime > 0 && audioRef.current && loadedTrackIdRef.current === track.id) {
+          audioRef.current.currentTime = saved.currentTime;
+          setCurrentTime(saved.currentTime);
+        }
+      } catch (e) {
+        console.warn('Failed to restore track progress:', e);
       }
     })();
-  }, [track, isPlaying, playbackSpeed, userId]);
+
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id, playbackSpeed, userId]);
 
   // ── Sleep Timer Countdown ─────────────────────────────────────────────
-  // Fixed: sleepRemainingSeconds is NOT in the dependency array so the
-  // interval is created once per timer activation, not recreated every second.
   useEffect(() => {
     if (typeof sleepTimer !== 'number' || sleepTimer === 0 || sleepRemainingSeconds === null) {
       return;
@@ -335,7 +395,7 @@ export const AudioPlayer: React.FC<Props> = ({
     if (!('mediaSession' in navigator) || !track) return;
 
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    
+
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: `${track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}${track.name} (${track.arabicName})`,
@@ -359,7 +419,6 @@ export const AudioPlayer: React.FC<Props> = ({
         onPlayStateChangeRef.current(false);
       });
 
-      // Android / Bluetooth 'stop' action
       try {
         navigator.mediaSession.setActionHandler('stop', () => {
           audioRef.current?.pause();
@@ -405,7 +464,7 @@ export const AudioPlayer: React.FC<Props> = ({
     }
   }, [track]);
 
-  // ── MediaSession Position State (throttled ~1/sec) ────────────────────
+  // ── MediaSession Position State ────────────────────
   useEffect(() => {
     if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession) || duration <= 0 || isNaN(duration)) {
       return;
@@ -419,9 +478,7 @@ export const AudioPlayer: React.FC<Props> = ({
         playbackRate: playbackSpeed || 1.0,
         position: Math.max(0, Math.min(currentTime, duration))
       });
-    } catch {
-      // Ignore minor rounding sync errors
-    }
+    } catch {}
   }, [currentTime, duration, playbackSpeed]);
 
   // ── Keyboard Shortcuts ────────────────────────────────────────────────
@@ -464,10 +521,6 @@ export const AudioPlayer: React.FC<Props> = ({
           e.preventDefault();
           toggleMute();
           break;
-        case 'KeyF':
-          e.preventDefault();
-          setIsFullScreenOpen(prev => !prev);
-          break;
       }
     };
 
@@ -475,23 +528,28 @@ export const AudioPlayer: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay, handleSkip, toggleMute]);
 
-  if (!track) return null;
-
-  const DEFAULT_QURAN_ARTWORK = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <rect width="120" height="120" rx="24" fill="#059669"/>
-  <circle cx="60" cy="60" r="44" fill="none" stroke="#d97706" stroke-width="2"/>
-  <circle cx="60" cy="60" r="36" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3 3"/>
-  <polygon points="60,28 69,51 93,60 69,69 60,92 51,69 27,60 51,51" fill="#d97706" opacity="0.9"/>
-  <circle cx="60" cy="60" r="24" fill="#ffffff"/>
-  <circle cx="60" cy="60" r="10" fill="#059669"/>
-</svg>
-`)}`;
-
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-  return (
-    <>
+  return {
+    audioRef,
+    isBuffering,
+    loadError,
+    currentTime,
+    duration,
+    playbackSpeed,
+    repeatMode,
+    sleepTimer,
+    sleepRemainingSeconds,
+    volume,
+    isMuted,
+    handleTogglePlay,
+    handleSeek,
+    handleSkip,
+    cycleSpeed,
+    toggleRepeat,
+    toggleMute,
+    handleVolumeChange,
+    handleSetSleepTimer,
+    setAutoplayIntent: (val: boolean) => { autoplayIntentRef.current = val; },
+    audioElement: (
       <audio
         ref={audioRef}
         preload="metadata"
@@ -503,151 +561,8 @@ export const AudioPlayer: React.FC<Props> = ({
         onCanPlay={handleCanPlay}
         onPause={handlePause}
         onEnded={handleTrackEnded}
+        onError={handleError}
       />
-
-      {/* Floating Mini Player Bar */}
-      <div 
-        className="mini-player-bar" 
-        onClick={() => setIsFullScreenOpen(true)}
-        role="button"
-        tabIndex={0}
-        aria-label="Expand Now Playing"
-      >
-        {/* Top Progress Line Indicator */}
-        <div 
-          className="mini-player-progress-line" 
-          style={{ width: `${progressPercent}%` }} 
-        />
-
-        <div className="mini-player-inner">
-          {/* Left: Artwork Medallion & Info */}
-          <div className="mini-player-info">
-            <div className="mini-player-medallion">
-              <img
-                src={track.artwork_url || DEFAULT_QURAN_ARTWORK}
-                alt={track.name}
-                className="mini-player-artwork"
-              />
-              {isPlaying && !isBuffering && (
-                <div className="mini-player-wave-overlay">
-                  <span className="mini-wave-bar bar-1"></span>
-                  <span className="mini-wave-bar bar-2"></span>
-                  <span className="mini-wave-bar bar-3"></span>
-                </div>
-              )}
-            </div>
-
-            <div className="mini-player-text">
-              <div className="mini-player-title-row">
-                <span className="mini-player-title">
-                  {track.surahNumber > 0 ? `${track.surahNumber}. ` : ''}{track.name}
-                </span>
-                <span className="mini-player-arabic arabic-text">{track.arabicName}</span>
-              </div>
-              <div className="mini-player-sub">
-                <span className="mini-reciter-name">{track.reciterName}</span>
-                <span className="mini-dot-sep">•</span>
-                <span className="mini-time-text">{formatTime(currentTime)} / {formatTime(duration)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Quick Action Controls */}
-          <div className="mini-player-actions" onClick={(e) => e.stopPropagation()}>
-            <button 
-              className={`mini-icon-btn favorite-mini-btn ${isFavorite ? 'active-star' : ''}`}
-              onClick={onToggleFavorite}
-              title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
-            >
-              <Star size={16} fill={isFavorite ? 'var(--accent-gold)' : 'none'} color={isFavorite ? 'var(--accent-gold)' : 'currentColor'} />
-            </button>
-
-            <button
-              className="mini-icon-btn"
-              onClick={onPrevTrack}
-              title="Previous Surah"
-              aria-label="Previous Surah"
-            >
-              <SkipBack size={18} />
-            </button>
-
-            <button
-              className="mini-play-btn"
-              onClick={handleTogglePlay}
-              title={isPlaying ? 'Pause' : 'Play'}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isBuffering ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : isPlaying ? (
-                <Pause size={18} fill="currentColor" />
-              ) : (
-                <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />
-              )}
-            </button>
-
-            <button
-              className="mini-icon-btn"
-              onClick={onNextTrack}
-              title="Next Surah"
-              aria-label="Next Surah"
-            >
-              <SkipForward size={18} />
-            </button>
-
-            <button 
-              className="mini-expand-btn" 
-              onClick={() => setIsFullScreenOpen(true)}
-              title="Expand Full Screen Player"
-            >
-              <ChevronUp size={18} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Expandable Full-Screen Sheet Modal */}
-      <FullScreenPlayer
-        isOpen={isFullScreenOpen}
-        onClose={() => setIsFullScreenOpen(false)}
-        track={track}
-        isPlaying={isPlaying}
-        isBuffering={isBuffering}
-        currentTime={currentTime}
-        duration={duration}
-        playbackSpeed={playbackSpeed}
-        repeatMode={repeatMode}
-        sleepTimer={sleepTimer}
-        sleepRemainingSeconds={sleepRemainingSeconds}
-        volume={volume}
-        isMuted={isMuted}
-        isFavorite={isFavorite}
-        onTogglePlay={handleTogglePlay}
-        onSeek={handleSeek}
-        onSkip={handleSkip}
-        onNextTrack={onNextTrack}
-        onPrevTrack={onPrevTrack}
-        onCycleSpeed={cycleSpeed}
-        onToggleRepeat={toggleRepeat}
-        onSetSleepTimer={(val) => {
-          setSleepTimer(val);
-          if (typeof val === 'number' && val > 0) {
-            setSleepRemainingSeconds(val * 60);
-          } else {
-            setSleepRemainingSeconds(null);
-          }
-        }}
-        onToggleMute={toggleMute}
-        onVolumeChange={(val) => {
-          setVolume(val);
-          if (audioRef.current) {
-            audioRef.current.volume = val;
-            audioRef.current.muted = false;
-          }
-          setIsMuted(false);
-        }}
-        onToggleFavorite={onToggleFavorite}
-      />
-    </>
-  );
-};
+    )
+  };
+}
