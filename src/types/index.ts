@@ -50,6 +50,21 @@ export interface LastSession {
   updatedAt: string;
 }
 
+/** One entry of a playlist: a Surah recited by a specific reciter. */
+export interface PlaylistItem {
+  surahNumber: number;
+  reciterId: string;
+}
+
+/** An ordered queue the user built by hand, mixing reciters per Surah. */
+export interface Playlist {
+  id: string;
+  name: string;
+  items: PlaylistItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FirebaseConfigState {
   apiKey: string;
   authDomain: string;

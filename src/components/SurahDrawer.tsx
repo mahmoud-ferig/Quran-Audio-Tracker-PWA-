@@ -1,12 +1,16 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Star, X, Sparkles, ChevronDown } from 'lucide-react';
-import type { Track, Reciter, ListeningProgress } from '../types';
-import { RECITERS } from '../services/quranData';
+import { Search, Star, X, Sparkles, ChevronDown, Plus, Check, Trash2, ArrowUp, ArrowDown, ListMusic } from 'lucide-react';
+import type { Track, Reciter, ListeningProgress, Playlist } from '../types';
+import { RECITERS, SURAH_METADATA } from '../services/quranData';
+import { getRecitersForSurah, playlistItemKey } from '../services/playlists';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  /** Full Surah list of the selected reciter (browse mode). */
   tracks: Track[];
+  /** The active playlist as playable tracks (queue mode). */
+  queueTracks: Track[];
   activeTrackId: string | null;
   isPlaying: boolean;
   progressMap: Record<string, ListeningProgress>;
@@ -15,12 +19,25 @@ interface Props {
   onSelectReciter: (reciter: Reciter) => void;
   onToggleFavorite: (surahNumber: number) => void;
   onSelectTrack: (track: Track) => void;
+  // Playlists
+  playlists: Playlist[];
+  activePlaylist: Playlist | null;
+  onCreatePlaylist: (name: string) => void;
+  onRenamePlaylist: (playlistId: string, name: string) => void;
+  onDeletePlaylist: (playlistId: string) => void;
+  onActivatePlaylist: (playlistId: string) => void;
+  onExitPlaylist: () => void;
+  onAddTrackToPlaylist: (track: Track) => void;
+  onRemovePlaylistItem: (index: number) => void;
+  onMovePlaylistItem: (index: number, delta: number) => void;
+  onChangePlaylistItemReciter: (index: number, reciterId: string) => void;
 }
 
 export const SurahDrawer: React.FC<Props> = ({
   isOpen,
   onClose,
   tracks,
+  queueTracks,
   activeTrackId,
   isPlaying,
   progressMap,
@@ -28,14 +45,52 @@ export const SurahDrawer: React.FC<Props> = ({
   selectedReciterId,
   onSelectReciter,
   onToggleFavorite,
-  onSelectTrack
+  onSelectTrack,
+  playlists,
+  activePlaylist,
+  onCreatePlaylist,
+  onRenamePlaylist,
+  onDeletePlaylist,
+  onActivatePlaylist,
+  onExitPlaylist,
+  onAddTrackToPlaylist,
+  onRemovePlaylistItem,
+  onMovePlaylistItem,
+  onChangePlaylistItemReciter
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'favorites' | 'Meccan' | 'Medinan' | 'progress'>('all');
   const [styleFilter, setStyleFilter] = useState<string>('all');
   const [isReciterExpanded, setIsReciterExpanded] = useState(false);
+  const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  // Which list the drawer shows while a playlist is the queue. Stored per
+  // playlist id, so activating another playlist goes back to queue view.
+  const [browseOverrideFor, setBrowseOverrideFor] = useState<string | null>(null);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
+
+  const playlistIsQueue = !!activePlaylist && activePlaylist.items.length > 0;
+  const showingQueue = playlistIsQueue && browseOverrideFor !== activePlaylist?.id;
+  const displayTracks = showingQueue ? queueTracks : tracks;
+
+  /** Where a tap on “+” goes: the active playlist, else the newest one. */
+  const targetPlaylist = useMemo(() => {
+    if (activePlaylist) return activePlaylist;
+    return playlists.length > 0 ? playlists[0] : null;
+  }, [activePlaylist, playlists]);
+
+  const targetKeys = useMemo(
+    () => new Set((targetPlaylist?.items ?? []).map(playlistItemKey)),
+    [targetPlaylist]
+  );
+
+  const handleCreatePlaylist = () => {
+    const name = newPlaylistName.trim();
+    if (!name) return;
+    onCreatePlaylist(name);
+    setNewPlaylistName('');
+  };
 
   // Swipe gesture for mobile
   const touchStartY = useRef<number>(0);
@@ -69,7 +124,7 @@ export const SurahDrawer: React.FC<Props> = ({
   }, [styleFilter]);
 
   const filteredTracks = useMemo(() => {
-    return tracks.filter((track) => {
+    return displayTracks.filter((track) => {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !q ||
@@ -90,7 +145,7 @@ export const SurahDrawer: React.FC<Props> = ({
 
       return true;
     });
-  }, [tracks, searchQuery, filterType, favorites, progressMap]);
+  }, [displayTracks, searchQuery, filterType, favorites, progressMap]);
 
   const inProgressCount = useMemo(() => {
     return Object.values(progressMap).filter((p) => p.currentTime > 5 && p.percentage < 98).length;
@@ -229,6 +284,176 @@ export const SurahDrawer: React.FC<Props> = ({
           )}
         </div>
 
+        {/* Playlist Section */}
+        <div className="drawer-section">
+          <button
+            className="drawer-section-toggle"
+            onClick={() => setIsPlaylistExpanded(!isPlaylistExpanded)}
+          >
+            <div className="drawer-section-title">
+              <span>Playlist</span>
+              <span className="drawer-section-arabic arabic-text">قائمة التشغيل</span>
+            </div>
+            <div className="drawer-section-current">
+              <span className="drawer-current-reciter">
+                {activePlaylist
+                  ? activePlaylist.name
+                  : playlists.length > 0
+                    ? `${playlists.length} saved`
+                    : 'None'}
+              </span>
+              <ChevronDown size={16} className={`drawer-chevron ${isPlaylistExpanded ? 'expanded' : ''}`} />
+            </div>
+          </button>
+
+          {isPlaylistExpanded && (
+            <div className="drawer-playlist-panel">
+              {/* Create */}
+              <div className="drawer-playlist-create">
+                <input
+                  type="text"
+                  className="drawer-playlist-input"
+                  placeholder="New playlist name…"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreatePlaylist();
+                  }}
+                  aria-label="New playlist name"
+                />
+                <button
+                  className="drawer-playlist-create-btn"
+                  onClick={handleCreatePlaylist}
+                  disabled={!newPlaylistName.trim()}
+                >
+                  <Plus size={14} />
+                  Create
+                </button>
+              </div>
+
+              {playlists.length === 0 ? (
+                <p className="drawer-playlist-hint">
+                  Create a playlist, then tap <Plus size={12} /> on any Surah to add it. Pick a
+                  different reciter first to change who recites that Surah.
+                </p>
+              ) : (
+                <div className="drawer-playlist-list">
+                  {playlists.map((playlist) => {
+                    const isActive = playlist.id === activePlaylist?.id;
+                    return (
+                      <div
+                        key={playlist.id}
+                        className={`drawer-playlist-item ${isActive ? 'active' : ''}`}
+                      >
+                        <button
+                          className="drawer-playlist-main"
+                          onClick={() => onActivatePlaylist(playlist.id)}
+                          title={isActive ? 'Currently the playback queue' : 'Play this playlist'}
+                        >
+                          <ListMusic size={14} className="drawer-playlist-icon" />
+                          <span className="drawer-playlist-name">{playlist.name}</span>
+                          <span className="drawer-playlist-count">
+                            {playlist.items.length} {playlist.items.length === 1 ? 'surah' : 'surahs'}
+                          </span>
+                          {isActive && <Check size={14} className="drawer-playlist-check" />}
+                        </button>
+                        <button
+                          className="drawer-playlist-icon-btn"
+                          title={isActive ? 'Save & stop using as queue' : 'Delete playlist'}
+                          onClick={() => (isActive ? onExitPlaylist() : onDeletePlaylist(playlist.id))}
+                        >
+                          {isActive ? <X size={14} /> : <Trash2 size={14} />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Editor for the selected playlist */}
+              {activePlaylist && (
+                <div className="drawer-playlist-editor">
+                  <div className="drawer-playlist-editor-head">
+                    <input
+                      key={activePlaylist.id}
+                      className="drawer-playlist-title-input"
+                      defaultValue={activePlaylist.name}
+                      onBlur={(e) => onRenamePlaylist(activePlaylist.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      }}
+                      aria-label="Playlist name"
+                    />
+                    <span className="drawer-playlist-editor-count">
+                      {activePlaylist.items.length} queued
+                    </span>
+                  </div>
+
+                  {activePlaylist.items.length === 0 ? (
+                    <p className="drawer-playlist-hint">
+                      Empty playlist — tap <Plus size={12} /> on a Surah to queue it.
+                    </p>
+                  ) : (
+                    activePlaylist.items.map((item, index) => {
+                      const surah = SURAH_METADATA.find((s) => s.number === item.surahNumber);
+                      const options = getRecitersForSurah(item.surahNumber);
+                      return (
+                        <div key={`${playlistItemKey(item)}_${index}`} className="playlist-row">
+                          <span className="playlist-row-index">{index + 1}</span>
+
+                          <div className="playlist-row-info">
+                            <span className="playlist-row-surah">
+                              {surah ? `${surah.number}. ${surah.name}` : `Surah ${item.surahNumber}`}
+                            </span>
+                            <select
+                              className="playlist-row-reciter"
+                              value={item.reciterId}
+                              onChange={(e) => onChangePlaylistItemReciter(index, e.target.value)}
+                              aria-label={`Reciter for ${surah ? surah.name : 'this Surah'}`}
+                            >
+                              {options.map((reciter) => (
+                                <option key={reciter.id} value={reciter.id}>
+                                  {reciter.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="playlist-row-actions">
+                            <button
+                              onClick={() => onMovePlaylistItem(index, -1)}
+                              disabled={index === 0}
+                              title="Move up"
+                              aria-label="Move up"
+                            >
+                              <ArrowUp size={13} />
+                            </button>
+                            <button
+                              onClick={() => onMovePlaylistItem(index, 1)}
+                              disabled={index === activePlaylist.items.length - 1}
+                              title="Move down"
+                              aria-label="Move down"
+                            >
+                              <ArrowDown size={13} />
+                            </button>
+                            <button
+                              onClick={() => onRemovePlaylistItem(index)}
+                              title="Remove from playlist"
+                              aria-label="Remove from playlist"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Search */}
         <div className="drawer-search">
           <Search className="drawer-search-icon" size={16} />
@@ -248,12 +473,39 @@ export const SurahDrawer: React.FC<Props> = ({
 
         {/* Filter Chips */}
         <div className="drawer-filter-row">
-          <button
-            className={`drawer-chip ${filterType === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterType('all')}
-          >
-            All ({tracks.length})
-          </button>
+          {playlistIsQueue && (
+            <>
+              <button
+                className={`drawer-chip ${showingQueue && filterType === 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setBrowseOverrideFor(null);
+                  setFilterType('all');
+                }}
+                title="The playlist is the playback queue"
+              >
+                <ListMusic size={12} />
+                Queue ({queueTracks.length})
+              </button>
+              <button
+                className={`drawer-chip ${!showingQueue && filterType === 'all' ? 'active' : ''}`}
+                onClick={() => {
+                  setBrowseOverrideFor(activePlaylist?.id ?? null);
+                  setFilterType('all');
+                }}
+                title="Browse all Surahs of the selected reciter"
+              >
+                All surahs ({tracks.length})
+              </button>
+            </>
+          )}
+          {!playlistIsQueue && (
+            <button
+              className={`drawer-chip ${filterType === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterType('all')}
+            >
+              All ({tracks.length})
+            </button>
+          )}
           <button
             className={`drawer-chip ${filterType === 'favorites' ? 'active' : ''}`}
             onClick={() => setFilterType('favorites')}
@@ -336,17 +588,37 @@ export const SurahDrawer: React.FC<Props> = ({
                 {/* Right Side */}
                 <div className="drawer-surah-right">
                   {track.surahNumber > 0 && (
-                    <button
-                      type="button"
-                      className={`drawer-fav-btn ${isFav ? 'active' : ''}`}
-                      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(track.surahNumber);
-                      }}
-                    >
-                      <Star size={14} fill={isFav ? 'currentColor' : 'none'} />
-                    </button>
+                    <div className="drawer-surah-actions">
+                      <button
+                        type="button"
+                        className={`drawer-add-btn ${targetKeys.has(track.id) ? 'active' : ''}`}
+                        title={
+                          targetKeys.has(track.id)
+                            ? `Already in "${targetPlaylist?.name ?? 'playlist'}"`
+                            : `Add to "${targetPlaylist?.name ?? 'a new playlist'}"`
+                        }
+                        aria-label="Add to playlist"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddTrackToPlaylist(track);
+                          // A brand new playlist is worth showing straight away.
+                          if (playlists.length === 0) setIsPlaylistExpanded(true);
+                        }}
+                      >
+                        {targetKeys.has(track.id) ? <Check size={14} /> : <Plus size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className={`drawer-fav-btn ${isFav ? 'active' : ''}`}
+                        title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleFavorite(track.surahNumber);
+                        }}
+                      >
+                        <Star size={14} fill={isFav ? 'currentColor' : 'none'} />
+                      </button>
+                    </div>
                   )}
                   <div className="drawer-surah-arabic arabic-text">{track.arabicName}</div>
                   {isComplete ? (
@@ -372,7 +644,7 @@ export const SurahDrawer: React.FC<Props> = ({
                 className="drawer-empty-reset"
                 onClick={() => { setSearchQuery(''); setFilterType('all'); }}
               >
-                Show All {tracks.length} Surahs
+                Show All {displayTracks.length} Surahs
               </button>
             </div>
           )}

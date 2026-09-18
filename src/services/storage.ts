@@ -1,5 +1,5 @@
 import { initializeFirebase, doc, getDoc, setDoc, getDocs, collection, query, where } from '../firebase/config';
-import type { ListeningProgress, LastSession, UserSettings } from '../types';
+import type { ListeningProgress, LastSession, Playlist, PlaylistItem, UserSettings } from '../types';
 
 const STORAGE_KEY_USER_ID = 'quran_tracker_user_id';
 const STORAGE_KEY_USER_EMAIL = 'quran_tracker_user_email';
@@ -8,6 +8,8 @@ const STORAGE_KEY_LOCAL_PROGRESS = 'quran_tracker_local_progress';
 const STORAGE_KEY_LOCAL_LAST_SESSION = 'quran_tracker_local_last_session';
 const STORAGE_KEY_LOCAL_FAVORITES = 'quran_tracker_local_favorites';
 const STORAGE_KEY_AUTOPLAY = 'quran_tracker_autoplay';
+const STORAGE_KEY_LOCAL_PLAYLISTS = 'quran_tracker_local_playlists';
+const STORAGE_KEY_ACTIVE_PLAYLIST = 'quran_tracker_active_playlist';
 
 /**
  * Get User Email if linked
@@ -150,6 +152,19 @@ export async function migrateUserData(fromUserId: string, toEmail: string): Prom
             userId: normalizedEmail,
             ...lastSession
           }, { merge: true }), 1500).catch((e) => console.warn('Firestore session sync skipped:', e))
+        );
+      }
+
+      // Migrate Playlists
+      const playlists = getLocalPlaylists();
+      if (playlists.length > 0) {
+        const playlistDoc = doc(db, 'user_playlists', normalizedEmail);
+        promises.push(
+          withTimeout(setDoc(playlistDoc, {
+            userId: normalizedEmail,
+            playlists,
+            updatedAt: new Date().toISOString()
+          }, { merge: true }), 1500).catch((e) => console.warn('Firestore playlists sync skipped:', e))
         );
       }
 
@@ -449,4 +464,127 @@ export async function saveUserSettings(userId: string, settings: Partial<UserSet
   }
 
   return updated;
+}
+
+/**
+ * Playlists Management
+ * Same pattern as favorites/settings: localStorage is the offline source of
+ * truth, Firestore mirrors it for cross-device sync.
+ */
+function sanitizePlaylists(value: unknown): Playlist[] {
+  if (!Array.isArray(value)) return [];
+  const playlists: Playlist[] = [];
+
+  for (const raw of value as unknown[]) {
+    if (!raw || typeof raw !== 'object') continue;
+    const source = raw as {
+      id?: unknown;
+      name?: unknown;
+      createdAt?: unknown;
+      updatedAt?: unknown;
+      items?: unknown;
+    };
+
+    const id = String(source.id ?? '');
+    if (!id) continue;
+
+    const items: PlaylistItem[] = [];
+    if (Array.isArray(source.items)) {
+      for (const rawItem of source.items as unknown[]) {
+        if (!rawItem || typeof rawItem !== 'object') continue;
+        const item = rawItem as { surahNumber?: unknown; reciterId?: unknown };
+        const surahNumber = Number(item.surahNumber);
+        const reciterId = String(item.reciterId ?? '');
+        if (Number.isInteger(surahNumber) && surahNumber > 0 && reciterId) {
+          items.push({ surahNumber, reciterId });
+        }
+      }
+    }
+
+    const now = new Date().toISOString();
+    playlists.push({
+      id,
+      name: String(source.name ?? 'Playlist'),
+      createdAt: String(source.createdAt ?? now),
+      updatedAt: String(source.updatedAt ?? now),
+      items
+    });
+  }
+
+  return playlists;
+}
+
+export function getLocalPlaylists(): Playlist[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LOCAL_PLAYLISTS);
+    return raw ? sanitizePlaylists(JSON.parse(raw)) : [];
+  } catch (e) {
+    console.error('Error reading playlists:', e);
+    return [];
+  }
+}
+
+function saveLocalPlaylists(playlists: Playlist[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_LOCAL_PLAYLISTS, JSON.stringify(playlists));
+  } catch (e) {
+    console.error('Error saving playlists:', e);
+  }
+}
+
+export async function getPlaylists(userId: string): Promise<Playlist[]> {
+  const local = getLocalPlaylists();
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_playlists', userId);
+      const snap = await withTimeout(getDoc(docRef), 2000);
+      if (snap && snap.exists()) {
+        const remote = sanitizePlaylists(snap.data()?.playlists);
+        // An empty cloud document must not wipe playlists created offline.
+        if (remote.length > 0) {
+          saveLocalPlaylists(remote);
+          return remote;
+        }
+      }
+    } catch (err) {
+      console.warn('Firestore playlists fetch failed, using local cache:', err);
+    }
+  }
+
+  return local;
+}
+
+export async function savePlaylists(userId: string, playlists: Playlist[]): Promise<Playlist[]> {
+  saveLocalPlaylists(playlists);
+
+  const { db, isConfigured } = initializeFirebase();
+  if (isConfigured && db) {
+    try {
+      const docRef = doc(db, 'user_playlists', userId);
+      await withTimeout(setDoc(docRef, {
+        userId,
+        playlists,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }), 2000);
+    } catch (err) {
+      console.warn('Firestore playlists save failed:', err);
+    }
+  }
+
+  return playlists;
+}
+
+/** Playlist used as the queue, remembered per device. */
+export function getActivePlaylistId(): string | null {
+  return localStorage.getItem(STORAGE_KEY_ACTIVE_PLAYLIST) || null;
+}
+
+export function setActivePlaylistId(playlistId: string | null): void {
+  if (playlistId) {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_PLAYLIST, playlistId);
+  } else {
+    localStorage.removeItem(STORAGE_KEY_ACTIVE_PLAYLIST);
+  }
 }

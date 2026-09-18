@@ -1312,6 +1312,297 @@ html, body {
   color: var(--accent-gold);
 }
 
+/* ── Playlist Section ─────────────────────────────────────────── */
+.drawer-playlist-panel {
+  padding: 0 16px 12px;
+}
+
+.drawer-playlist-create {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.drawer-playlist-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.drawer-playlist-input::placeholder {
+  color: var(--text-muted);
+}
+
+.drawer-playlist-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-active);
+  background: var(--accent-emerald-glow);
+  color: var(--accent-emerald);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.drawer-playlist-create-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.drawer-playlist-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  padding: 10px 2px 2px;
+}
+
+.drawer-playlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.drawer-playlist-item {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.drawer-playlist-item:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-subtle);
+}
+
+.drawer-playlist-item.active {
+  background: var(--accent-emerald-glow);
+  border-color: var(--border-active);
+}
+
+.drawer-playlist-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawer-playlist-icon {
+  color: var(--accent-emerald);
+  flex-shrink: 0;
+}
+
+.drawer-playlist-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-playlist-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.drawer-playlist-check {
+  color: var(--accent-emerald);
+  flex-shrink: 0;
+}
+
+.drawer-playlist-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drawer-playlist-icon-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.drawer-playlist-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.drawer-playlist-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-playlist-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.drawer-playlist-editor-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* One editable playlist entry */
+.playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-surface-elevated);
+}
+
+.playlist-row-index {
+  width: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.playlist-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-row-surah {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-row-reciter {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--accent-emerald);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.playlist-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.playlist-row-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.playlist-row-actions button:hover:not(:disabled) {
+  background: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.playlist-row-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Add-to-playlist button on a Surah row */
+.drawer-surah-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.drawer-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.drawer-add-btn:hover {
+  background: var(--bg-surface-elevated);
+}
+
+.drawer-add-btn.active {
+  color: var(--accent-emerald);
+}
+
 .drawer-surah-arabic {
   font-size: 15px;
   color: var(--text-secondary);
