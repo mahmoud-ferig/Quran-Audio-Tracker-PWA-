@@ -131,6 +131,209 @@ export const RECITERS: Reciter[] = [
     style: 'Murattal',
     photoUrl: makeAvatar('IA', 'إدريس أبكر'),
     serverUrl: 'https://server6.mp3quran.net/abkr/'
+  },
+  // ── Additional reciters ──────────────────────────────────────────────
+  // Every serverUrl below comes from the official mp3quran API v3 and was
+  // verified to serve all 114 surahs as `<number padded to 3>.mp3`.
+  {
+    id: 'huthaify',
+    name: 'Ali Al-Huthaify',
+    arabicName: 'علي بن عبدالرحمن الحذيفي',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('AAH', 'الحذيفي'),
+    serverUrl: 'https://server9.mp3quran.net/hthfi/'
+  },
+  {
+    id: 'ayyub',
+    name: 'Muhammad Ayyub',
+    arabicName: 'محمد أيوب',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('MA', 'أيوب'),
+    serverUrl: 'https://server8.mp3quran.net/ayyub/'
+  },
+  {
+    id: 'basfar',
+    name: 'Abdullah Basfar',
+    arabicName: 'عبدالله بصفر',
+    style: 'Murattal',
+    photoUrl: makeAvatar('AB', 'بصفر'),
+    serverUrl: 'https://server6.mp3quran.net/bsfr/'
+  },
+  {
+    id: 'rifai',
+    name: 'Hani Ar-Rifai',
+    arabicName: 'هاني الرفاعي',
+    style: 'Murattal',
+    photoUrl: makeAvatar('HR', 'الرفاعي'),
+    serverUrl: 'https://server8.mp3quran.net/hani/'
+  },
+  {
+    id: 'ajmi',
+    name: 'Ahmad Al-Ajmi',
+    arabicName: 'أحمد بن علي العجمي',
+    style: 'Murattal (Haram Makkah)',
+    photoUrl: makeAvatar('AAA', 'العجمي'),
+    serverUrl: 'https://server10.mp3quran.net/ajm/'
+  },
+  {
+    id: 'jileel',
+    name: 'Khalid Al-Jileel',
+    arabicName: 'خالد الجليل',
+    style: 'Murattal',
+    photoUrl: makeAvatar('KJ', 'الجليل'),
+    serverUrl: 'https://server10.mp3quran.net/jleel/'
+  },
+  {
+    id: 'qatami',
+    name: 'Nasser Al-Qatami',
+    arabicName: 'ناصر القطامي',
+    style: 'Murattal (Haram Makkah)',
+    photoUrl: makeAvatar('NQ', 'القطامي'),
+    serverUrl: 'https://server6.mp3quran.net/qtm/'
+  },
+  {
+    id: 'fares_abbad',
+    name: 'Fares Abbad',
+    arabicName: 'فارس عباد',
+    style: 'Murattal',
+    photoUrl: makeAvatar('FA', 'عباد'),
+    serverUrl: 'https://server8.mp3quran.net/frs_a/'
+  },
+  {
+    id: 'baleela',
+    name: 'Bandar Baleela',
+    arabicName: 'بندر بليله',
+    style: 'Murattal (Haram Makkah)',
+    photoUrl: makeAvatar('BB', 'بليله'),
+    serverUrl: 'https://server6.mp3quran.net/balilah/'
+  },
+  {
+    id: 'juhany',
+    name: 'Abdullah Al-Juhany',
+    arabicName: 'عبدالله عواد الجهني',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('AAJ', 'الجهني'),
+    serverUrl: 'https://server13.mp3quran.net/jhn/'
+  },
+  {
+    id: 'salemi',
+    name: 'Mansour Al-Salemi',
+    arabicName: 'منصور السالمي',
+    style: 'Murattal',
+    photoUrl: makeAvatar('MS', 'السالمي'),
+    serverUrl: 'https://server14.mp3quran.net/mansor/'
+  },
+  {
+    id: 'deais',
+    name: 'Rami Al-Deais',
+    arabicName: 'رامي الدعيس',
+    style: 'Murattal (Haram Makkah)',
+    photoUrl: makeAvatar('RD', 'الدعيس'),
+    serverUrl: 'https://server6.mp3quran.net/rami/'
+  },
+  {
+    id: 'raad_kurdi',
+    name: 'Raad Muhammad Al-Kurdi',
+    arabicName: 'رعد محمد الكردي',
+    style: 'Murattal',
+    photoUrl: makeAvatar('RMK', 'الكردي'),
+    serverUrl: 'https://server6.mp3quran.net/kurdi/'
+  },
+  {
+    id: 'yasser_salamah',
+    name: 'Yasser Salamah',
+    arabicName: 'ياسر سلامة',
+    style: 'Murattal',
+    photoUrl: makeAvatar('YS', 'سلامة'),
+    serverUrl: 'https://server12.mp3quran.net/salamah/Rewayat-Hafs-A-n-Assem/'
+  },
+  {
+    id: 'budair',
+    name: 'Salah Al-Budair',
+    arabicName: 'صلاح البدير',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('SB', 'البدير'),
+    serverUrl: 'https://server6.mp3quran.net/s_bud/'
+  },
+  {
+    id: 'lohaidan',
+    name: 'Mohammed Al-Lohaidan',
+    arabicName: 'محمد اللحيدان',
+    style: 'Murattal',
+    photoUrl: makeAvatar('ML', 'اللحيدان'),
+    serverUrl: 'https://server8.mp3quran.net/lhdan/'
+  },
+  {
+    id: 'qasim',
+    name: 'Abdulmohsen Al-Qasim',
+    arabicName: 'عبدالمحسن القاسم',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('AQ', 'القاسم'),
+    serverUrl: 'https://server8.mp3quran.net/qasm/'
+  },
+  {
+    id: 'muhaisny',
+    name: 'Muhammad Al-Muhaisny',
+    arabicName: 'محمد المحيسني',
+    style: 'Murattal',
+    photoUrl: makeAvatar('MM', 'المحيسني'),
+    serverUrl: 'https://server11.mp3quran.net/mhsny/'
+  },
+  {
+    id: 'nufais',
+    name: 'Ahmad Al-Nufais',
+    arabicName: 'أحمد النفيس',
+    style: 'Murattal',
+    photoUrl: makeAvatar('AN', 'النفيس'),
+    serverUrl: 'https://server16.mp3quran.net/nufais/Rewayat-Hafs-A-n-Assem/'
+  },
+  {
+    id: 'dukhain',
+    name: 'Haitham Al-Dukhain',
+    arabicName: 'هيثم الدخين',
+    style: 'Murattal (Haram Madinah)',
+    photoUrl: makeAvatar('HD', 'الدخين'),
+    serverUrl: 'https://server16.mp3quran.net/h_dukhain/Rewayat-Hafs-A-n-Assem/'
+  },
+  {
+    id: 'minshawi_molim',
+    name: 'Al-Minshawi (Teaching)',
+    arabicName: 'محمد صديق المنشاوي (المعلم)',
+    style: 'Murattal (Teaching)',
+    photoUrl: makeAvatar('MSM', 'المنشاوي'),
+    serverUrl: 'https://server10.mp3quran.net/minsh/Almusshaf-Al-Mo-lim/'
+  },
+  {
+    id: 'muaiqly_mujawwad',
+    name: 'Maher Al-Muaiqly (Mujawwad)',
+    arabicName: 'ماهر المعيقلي (مجود)',
+    style: 'Mujawwad',
+    photoUrl: makeAvatar('MAM', 'المعيقلي'),
+    serverUrl: 'https://server12.mp3quran.net/maher/Almusshaf-Al-Mojawwad/'
+  },
+  {
+    id: 'tablawi_murattal',
+    name: 'Mohammad Al-Tablaway',
+    arabicName: 'محمد الطبلاوي',
+    style: 'Murattal',
+    photoUrl: makeAvatar('MT', 'الطبلاوي'),
+    serverUrl: 'https://server12.mp3quran.net/tblawi/'
+  },
+  {
+    id: 'tablawi_mujawwad',
+    name: 'Al-Tablaway (Mujawwad)',
+    arabicName: 'محمد الطبلاوي (مجود)',
+    style: 'Mujawwad',
+    photoUrl: makeAvatar('MT', 'الطبلاوي'),
+    serverUrl: 'https://server12.mp3quran.net/tblawi/Al-Mojawwad/'
+  },
+  {
+    id: 'mustafa_ismail',
+    name: 'Mustafa Ismail (Mujawwad)',
+    arabicName: 'مصطفى إسماعيل (مجود)',
+    style: 'Mujawwad',
+    photoUrl: makeAvatar('MI', 'مصطفى'),
+    serverUrl: 'https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/'
   }
 ];
 
