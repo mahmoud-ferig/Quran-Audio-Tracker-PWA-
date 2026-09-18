@@ -33,6 +33,7 @@ interface Props {
   track: Track | null;
   isPlaying: boolean;
   isBuffering: boolean;
+  isRetrying: boolean;
   loadError: string | null;
   currentTime: number;
   duration: number;
@@ -47,6 +48,7 @@ interface Props {
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
   onSkip: (seconds: number) => void;
+  onRetry: () => void;
   onNextTrack: () => void;
   onPrevTrack: () => void;
   onCycleSpeed: () => void;
@@ -73,6 +75,7 @@ export const PlayerScreen: React.FC<Props> = ({
   track,
   isPlaying,
   isBuffering,
+  isRetrying,
   loadError,
   currentTime,
   duration,
@@ -87,6 +90,7 @@ export const PlayerScreen: React.FC<Props> = ({
   onTogglePlay,
   onSeek,
   onSkip,
+  onRetry,
   onNextTrack,
   onPrevTrack,
   onCycleSpeed,
@@ -262,15 +266,28 @@ export const PlayerScreen: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Error Banner */}
-      {loadError && (
-        <div className="player-error-banner">
-          <AlertCircle size={16} />
-          <span>{loadError}</span>
-          <button onClick={onTogglePlay} className="player-retry-btn">
-            <RefreshCw size={14} />
-            Retry
-          </button>
+      {/* Error / recovery banner */}
+      {(loadError || isRetrying) && (
+        <div
+          className={`player-error-banner${loadError ? '' : ' player-error-banner--recovering'}`}
+          role="status"
+          aria-live="polite"
+        >
+          {isRetrying && !loadError ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Reconnecting to the audio server…</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle size={16} />
+              <span>{loadError}</span>
+              <button onClick={onRetry} className="player-retry-btn" disabled={isRetrying}>
+                <RefreshCw size={14} className={isRetrying ? 'animate-spin' : undefined} />
+                Retry
+              </button>
+            </>
+          )}
         </div>
       )}
 

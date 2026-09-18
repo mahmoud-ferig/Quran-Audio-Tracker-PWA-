@@ -45,18 +45,38 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/server\d+\.mp3quran\.net\/.*\.mp3$/i,
-            handler: 'CacheFirst',
+            urlPattern: /^https:\/\/server\d+\.mp3quran\.net\/.+\.mp3(\?.*)?$/i,
+            // NetworkFirst (not CacheFirst) on purpose:
+            //  - Online users always get a fresh copy, so a single bad/partial cached
+            //    entry can never permanently break playback with
+            //    MEDIA_ERR_SRC_NOT_SUPPORTED ("Audio source not found").
+            //  - Offline users still fall back to the cache (explicit downloads).
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'quran-audio-cache',
               expiration: {
-                maxEntries: 114,
-                maxAgeSeconds: 60 * 60 * 24 * 60 // 60 Days
+                // Was 114; downloads live in this cache too, so keep headroom
+                // for explicitly downloaded surahs.
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 60, // 60 Days
+                purgeOnQuotaError: true
               },
               cacheableResponse: {
-                statuses: [0, 200, 206]
+                // ONLY complete 200 responses may be stored.
+                //  - 206 partial responses must never be cached: replaying a
+                //    truncated/partial body makes the browser reject the whole
+                //    file (this was the root cause of the random error banner).
+                //  - 0 (opaque) responses have an unreadable body, so range
+                //    slicing cannot work on them either.
+                statuses: [200]
               },
-              rangeRequests: true
+              rangeRequests: true,
+              matchOptions: {
+                // Audio hosts send "Vary: accept-encoding"; matching must not
+                // depend on it or an offline cache lookup can miss.
+                ignoreVary: true,
+                ignoreSearch: true
+              }
             }
           },
           {

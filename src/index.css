@@ -462,6 +462,18 @@ html, body {
   background: rgba(239, 68, 68, 0.15);
 }
 
+.player-retry-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Silent auto-retry in progress: informational, not alarming */
+.player-error-banner--recovering {
+  background: var(--accent-emerald-glow);
+  border-color: var(--accent-emerald-glow);
+  color: var(--accent-emerald);
+}
+
 /* ── Scrubber ─────────────────────────────────────────────────── */
 .player-scrubber {
   width: 100%;

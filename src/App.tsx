@@ -12,6 +12,7 @@ import {
 } from './services/storage';
 import { initializeFirebase } from './firebase/config';
 import { getStoredTheme, getStoredAccent, applyTheme } from './services/theme';
+import { purgeUnusableAudioCacheEntries } from './services/offlineStorage';
 import type { ThemeMode, AccentColor } from './services/theme';
 import { useAudioPlayer } from './components/AudioPlayer';
 import { PlayerScreen } from './components/PlayerScreen';
@@ -38,6 +39,13 @@ export const App: React.FC = () => {
     applyTheme(theme, accent);
   }, [theme, accent]);
 
+  // Self-heal caches written by older builds: partial (206) and opaque audio
+  // responses used to be replayed as truncated files, which the browser
+  // rejected at random with "Audio source not found".
+  useEffect(() => {
+    void purgeUnusableAudioCacheEntries();
+  }, []);
+
   const handleToggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
@@ -54,7 +62,7 @@ export const App: React.FC = () => {
 
   // 1. Initial & Account Change Load + Auto-Sync on Tab Focus
   useEffect(() => {
-    const initData = async () => {
+    const initData = async (isInitialLoad: boolean) => {
       try {
         const [prog, session, favs, settings] = await Promise.all([
           getAllProgress(userId),
@@ -64,6 +72,13 @@ export const App: React.FC = () => {
         ]);
         setProgressMap(prog);
         setFavorites(favs);
+
+        // Only the very first load decides which reciter/track is active.
+        // Re-running this on every focus/visibilitychange used to swap the
+        // track out from under the user while it was playing — which in turn
+        // reloaded the audio source mid-playback and could surface a load
+        // error for a track that was working perfectly fine.
+        if (!isInitialLoad) return;
 
         let reciterToUse = RECITERS[0];
         if (settings?.preferredReciterId) {
@@ -92,11 +107,11 @@ export const App: React.FC = () => {
       }
     };
 
-    initData();
+    initData(true);
 
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
-        initData();
+        initData(false);
       }
     };
 
@@ -133,6 +148,17 @@ export const App: React.FC = () => {
   // 3. Handle Track Selection — always autoplay
   const handleSelectTrack = (track: Track) => {
     setAutoplayIntentRef.current?.(true);
+
+    // Re-selecting the Surah that is already loaded must not be swallowed by
+    // the "same track" guard — it has to actually reload a failed source.
+    if (activeTrack?.id === track.id) {
+      if (audio.loadError || !isPlaying) {
+        audio.handleRetry();
+      }
+      setIsPlaying(true);
+      return;
+    }
+
     setActiveTrack(track);
     setIsPlaying(true);
   };
@@ -215,6 +241,7 @@ export const App: React.FC = () => {
         track={activeTrack}
         isPlaying={isPlaying}
         isBuffering={audio.isBuffering}
+        isRetrying={audio.isRetrying}
         loadError={audio.loadError}
         currentTime={audio.currentTime}
         duration={audio.duration}
@@ -229,6 +256,7 @@ export const App: React.FC = () => {
         onTogglePlay={audio.handleTogglePlay}
         onSeek={audio.handleSeek}
         onSkip={audio.handleSkip}
+        onRetry={audio.handleRetry}
         onNextTrack={handleNextTrack}
         onPrevTrack={handlePrevTrack}
         onCycleSpeed={audio.cycleSpeed}
