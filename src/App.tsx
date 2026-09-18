@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Track, Reciter, ListeningProgress } from './types';
-import { RECITERS, getTracksForReciter, generateTrackForSurah, SURAH_METADATA } from './services/quranData';
+import { RECITERS, getTracksForReciter } from './services/quranData';
 import {
   getOrCreateUserId,
   getAllProgress,
@@ -93,12 +93,16 @@ export const App: React.FC = () => {
         const reciterTracks = getTracksForReciter(reciterToUse);
         setTracks(reciterTracks);
 
-        // Restore last session track (but don't autoplay)
-        if (session && session.surahNumber > 0) {
-          const surah = SURAH_METADATA.find(s => s.number === session.surahNumber);
-          if (surah) {
-            setActiveTrack(generateTrackForSurah(surah, reciterToUse));
-          }
+        // Restore last session track (but don't autoplay). Reciters with a
+        // partial mushaf (historic recordings) may not have that Surah, so fall
+        // back to their first available one.
+        const restored =
+          session && session.surahNumber > 0
+            ? reciterTracks.find(t => t.surahNumber === session.surahNumber)
+            : undefined;
+
+        if (restored) {
+          setActiveTrack(restored);
         } else if (reciterTracks.length > 0) {
           setActiveTrack(reciterTracks[0]);
         }
@@ -131,16 +135,18 @@ export const App: React.FC = () => {
     setTracks(newTracks);
     saveUserSettings(userId, { preferredReciterId: reciter.id });
 
-    // If currently playing a track, switch to same surah with new reciter
+    // If a track is loaded, switch to the same Surah with the new reciter —
+    // unless that reciter never recorded it (partial mushaf), in which case
+    // fall back to their first available Surah.
     if (activeTrack && activeTrack.surahNumber > 0) {
-      const correspondingSurah = SURAH_METADATA.find(s => s.number === activeTrack.surahNumber);
-      if (correspondingSurah) {
-        const wasPlaying = isPlaying;
-        const updatedTrack = generateTrackForSurah(correspondingSurah, reciter);
-        if (wasPlaying) {
+      const matching =
+        newTracks.find(t => t.surahNumber === activeTrack.surahNumber) ?? newTracks[0];
+
+      if (matching) {
+        if (isPlaying) {
           setAutoplayIntentRef.current?.(true);
         }
-        setActiveTrack(updatedTrack);
+        setActiveTrack(matching);
       }
     }
   };

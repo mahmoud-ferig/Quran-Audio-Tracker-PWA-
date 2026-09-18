@@ -20,6 +20,12 @@ export interface Reciter {
   style: string;
   photoUrl?: string;
   serverUrl: string; // e.g., 'https://server8.mp3quran.net/afs/'
+  /**
+   * Surahs this reciter actually recorded. Omit for a complete mushaf (114);
+   * historic recitations are often partial, so the app only lists what exists
+   * instead of offering Surahs that would fail to play.
+   */
+  surahNumbers?: number[];
 }
 
 export interface ListeningProgress {

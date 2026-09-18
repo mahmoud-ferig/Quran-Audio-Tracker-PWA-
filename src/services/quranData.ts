@@ -334,6 +334,20 @@ export const RECITERS: Reciter[] = [
     style: 'Mujawwad',
     photoUrl: makeAvatar('MI', 'مصطفى'),
     serverUrl: 'https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/'
+  },
+  // Historic recitation: only 31 Surahs were recorded and survive, so the app
+  // lists exactly those instead of 114 (verified: the other 83 return 404).
+  {
+    id: 'refaat',
+    name: 'Sheikh Muhammad Refaat',
+    arabicName: 'الشيخ محمد رفعت',
+    style: 'Murattal (Classical)',
+    photoUrl: makeAvatar('MR', 'محمد رفعت'),
+    serverUrl: 'https://server14.mp3quran.net/refat/',
+    surahNumbers: [
+      1, 10, 11, 12, 17, 18, 19, 20, 48, 54, 55, 56, 69, 72, 73, 75, 76, 77, 78, 79, 81, 82, 83, 85, 86, 87,
+      88, 89, 96, 98, 100
+    ]
   }
 ];
 
@@ -467,6 +481,19 @@ export function getSurahPaddedNumber(num: number): string {
   return num.toString().padStart(3, '0');
 }
 
+/**
+ * The Surahs a reciter actually has. Most reciters recorded the full mushaf;
+ * historic ones (e.g. Sheikh Muhammad Refaat) only a part of it, and asking
+ * their server for a missing Surah returns 404.
+ */
+export function getSurahsForReciter(reciter: Reciter): SurahMeta[] {
+  if (!reciter.surahNumbers || reciter.surahNumbers.length === 0) {
+    return SURAH_METADATA;
+  }
+  const available = new Set(reciter.surahNumbers);
+  return SURAH_METADATA.filter((surah) => available.has(surah.number));
+}
+
 export function generateTrackForSurah(surah: SurahMeta, reciter: Reciter): Track {
   const padded = getSurahPaddedNumber(surah.number);
   const streamUrl = `${reciter.serverUrl}${padded}.mp3`;
@@ -487,5 +514,5 @@ export function generateTrackForSurah(surah: SurahMeta, reciter: Reciter): Track
 }
 
 export function getTracksForReciter(reciter: Reciter): Track[] {
-  return SURAH_METADATA.map((surah) => generateTrackForSurah(surah, reciter));
+  return getSurahsForReciter(reciter).map((surah) => generateTrackForSurah(surah, reciter));
 }

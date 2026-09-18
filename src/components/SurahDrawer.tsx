@@ -214,7 +214,11 @@ export const SurahDrawer: React.FC<Props> = ({
                       <div className="drawer-reciter-info">
                         <span className="drawer-reciter-name">{reciter.name}</span>
                         <span className="drawer-reciter-arabic arabic-text">{reciter.arabicName}</span>
-                        <span className="drawer-reciter-style">{reciter.style}</span>
+                        <span className="drawer-reciter-style">
+                          {reciter.surahNumbers && reciter.surahNumbers.length > 0
+                            ? `${reciter.style} · ${reciter.surahNumbers.length} surahs`
+                            : reciter.style}
+                        </span>
                       </div>
                       {isActive && <span className="drawer-reciter-active-dot" />}
                     </button>
@@ -368,7 +372,7 @@ export const SurahDrawer: React.FC<Props> = ({
                 className="drawer-empty-reset"
                 onClick={() => { setSearchQuery(''); setFilterType('all'); }}
               >
-                Show All 114 Surahs
+                Show All {tracks.length} Surahs
               </button>
             </div>
           )}
